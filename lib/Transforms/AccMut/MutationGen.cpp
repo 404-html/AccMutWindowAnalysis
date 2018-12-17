@@ -37,7 +37,8 @@
 using namespace llvm;
 using namespace std;
 
-ofstream  MutationGen::ofresult; 
+ofstream  MutationGen::ofresult;
+bool MutationGen::firstFunctionSeen = false;
 
 
 #define ARITH_OP_NUM 7
@@ -87,7 +88,16 @@ bool MutationGen::runOnFunction(Function &F) {
 	#endif
 
 
-    ofresult.open(getMutationFilePath(), ios::app);
+	auto t = F.getParent();
+	std::string filename = static_cast<std::string>(t->getName()) + ".mut";
+	std::cout << filename << std::endl;
+	if (!firstFunctionSeen) {
+	    ofresult.open(filename, ios::trunc);
+	    firstFunctionSeen = true;
+	} else {
+	    ofresult.open(filename, ios::app);
+	}
+    // ofresult.open(getMutationFilePath(), ios::app);
 
 	genMutationFile(F);
 

@@ -27,6 +27,7 @@ public:
 	virtual bool runOnFunction(Function &F);
 	static void genMutationFile(Function & F);
 	static std::string getMutationFilePath();
+	static bool firstFunctionSeen;
 private:
 	static void genAOR(Instruction *inst,StringRef fname, int index);
 	static void genLOR(Instruction *inst, StringRef fname, int index);

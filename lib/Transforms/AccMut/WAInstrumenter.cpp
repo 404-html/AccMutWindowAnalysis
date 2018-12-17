@@ -17,9 +17,10 @@ WAInstrumenter::WAInstrumenter() : ModulePass(ID) {}
 
 bool WAInstrumenter::runOnModule(Module &M)
 {
-    MutUtil::getAllMutations();
 
     TheModule = &M;
+
+    MutUtil::getAllMutations(TheModule->getName());
     setGoodVarFunc();
 
     bool changed = false;
@@ -297,7 +298,7 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
         ERRMSG("CAN NOT GET A POINTER");
         Value *v = dyn_cast<Value>(&*OI);
         llvm::errs()<<"\tCUR_OPREAND:\t";
-        v->dump();
+        // v->dump();
         exit(0);
     }
     return true;
@@ -632,8 +633,8 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
 
         }else{
             ERRMSG("ERR CALL TYPE ");
-            oricall->dump();
-            oricall->getType()->dump();
+            // oricall->dump();
+            // oricall->getType()->dump();
             exit(0);
         }//}else if(oricall->getType()->isPointerTy()){
 
@@ -776,9 +777,9 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
             params.push_back(gete);
         }else{
             ERRMSG("NOT A POINTER ");
-            cur_it->dump();
+            // cur_it->dump();
             Value *v = dyn_cast<Value>(&*addr);
-            v->dump();
+            // v->dump();
             exit(0);
         }
         CallInst *pre = CallInst::Create(prestfunc, params, "", &*cur_it);
@@ -923,7 +924,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                 }
             }else{
                 ERRMSG("ArithInst TYPE ERROR ");
-                cur_it->dump();
+                // cur_it->dump();
                 llvm::errs()<<*ori_ty<<"\n";
                 // TODO:: handle i1, i8, i64 ... type
                 exit(0);

@@ -28,25 +28,26 @@ void MutUtil::dumpAllMuts(){
 		}
 	}
 	errs()<<"--------------- END DUMP -----------------\n";
-}	
+}
 
-void MutUtil::getAllMutations(){
+void MutUtil::getAllMutations(const string &path){
 	if(allMutsGeted){
 		return;
 	}
 	string buf;
-	string path = getenv("HOME");
-	path += "/tmp/accmut/mutations.txt";
-	
-	std::ifstream  fin(path, ios::in); 
-	
+	// string path = getenv("HOME");
+	// path += "/tmp/accmut/mutations.txt";
+    string pathmut = path + ".mut";
+
+	std::ifstream  fin(pathmut, ios::in);
+
 	if(!fin.is_open()){
 		errs()<<"FILE ERROR : mutations.txt @ "<<path<<"\n";
 		exit(-1);
 	}
 
 	int id = 1;
-	while( fin>>buf) { 
+	while( fin>>buf) {
 		Mutation *m = getMutation(buf, id);
 		id++;
 		if(AllMutsMap.count(m->func) == 0){
@@ -63,6 +64,7 @@ void MutUtil::getAllMutations(){
 }
 
 Mutation *MutUtil::getMutation(string line, int id){
+    std::cout << line << std::endl;
 	stringstream ss;
 	ss<<line;
 	string mtype, func;
@@ -74,7 +76,7 @@ Mutation *MutUtil::getMutation(string line, int id){
 	ss>>colon;
 	ss>>sop;
 	ss>>colon;
-	
+
 	Mutation *m;
 	if(mtype == "AOR"){
 		AORMut *aor = new AORMut();
@@ -100,7 +102,7 @@ Mutation *MutUtil::getMutation(string line, int id){
 		ror->tar_pre = tp;
 		m = dyn_cast<Mutation>(ror);
 	}else if(mtype == "SOR"){
-		
+
 	}else if(mtype == "STD"){
 		STDMut *std = new STDMut();
 		int type;
@@ -109,7 +111,7 @@ Mutation *MutUtil::getMutation(string line, int id){
 		m = dyn_cast<Mutation>(std);
 	}else if(mtype == "LVR"){
 		LVRMut *lvr = new LVRMut();
-		int oi, sc, tc;	
+		int oi, sc, tc;
 		ss>>oi;
 		ss>>colon;
 		ss>>sc;
@@ -121,7 +123,7 @@ Mutation *MutUtil::getMutation(string line, int id){
 		m = dyn_cast<Mutation>(lvr);
 	}else if(mtype == "UOI"){
 		UOIMut *uoi = new UOIMut();
-		int oi, ut;	
+		int oi, ut;
 		ss>>oi;
 		ss>>colon;
 		ss>>ut;
@@ -167,7 +169,7 @@ BasicBlock::iterator MutUtil::getLocation(Function &F, int instrumented_insts, i
 			}
 		}
 	}
-	return F.back().end();	
+	return F.back().end();
 }
 
 int MutUtil::getOperandPtrDimension(Value* v){// TODO: check for getElemPtr !
@@ -178,7 +180,7 @@ int MutUtil::getOperandPtrDimension(Value* v){// TODO: check for getElemPtr !
 		}
 
 		LoadInst * lev_2_ld = dyn_cast<LoadInst>(ptr_of_ld);
-		
+
 		if(lev_2_ld){
 			Value *ptr_of_lev_2_ld = lev_2_ld->getPointerOperand();
 			if(dyn_cast<Constant>(ptr_of_lev_2_ld) || dyn_cast<AllocaInst>(ptr_of_lev_2_ld) || dyn_cast<GetElementPtrInst>(ptr_of_ld)){

@@ -33,9 +33,9 @@ bool MSInstrumenter::runOnFunction(Function & F){
 		return false;
 	}
 
-	MutUtil::getAllMutations();
-
 	TheModule = F.getParent();
+	MutUtil::getAllMutations(TheModule->getName());
+
 	if(F.getName().equals("main")){
 		Function* finit = TheModule->getFunction("__accmut__ms_init");
 		if (!finit) {
@@ -106,7 +106,7 @@ int MSInstrumenter::instrument(Function &F, vector<Mutation *>* v, int index, in
 	BasicBlock::iterator cur_it = MutUtil::getLocation(F, instrumented_insts, index);
 
 	errs()<<">>INSTRUMENTING MUTS FROM "<<mut_from<<" TO "<<mut_to<<" IN IR "<<index<<" >> ";
-	cur_it->dump();
+	// cur_it->dump();
 
 	BasicBlock *cur_bb = cur_it->getParent();
 
