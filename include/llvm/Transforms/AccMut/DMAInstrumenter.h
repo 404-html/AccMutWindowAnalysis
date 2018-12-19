@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file decribes the dynamic mutation analysis IR instrumenter pass
-// 
+//
 // Add by Wang Bo. OCT 21, 2015
 //
 //===----------------------------------------------------------------------===//
@@ -31,8 +31,11 @@ private:
 	void instrument(Function &F, vector<Mutation*> * v);
     BasicBlock::iterator getLocation(Function &F, int instrumented_insts, int index);
     bool hasMutation(Instruction *inst, vector<Mutation*>* v);
-    bool needInstrument(Instruction *I, vector<Mutation*>* v);    
+    bool needInstrument(Instruction *I, vector<Mutation*>* v);
     Module *TheModule;
+    bool firstTime = true;
+    GlobalVariable *rmigv;
+    StructType *regmutinfo;
 };
 
 #endif

@@ -64,7 +64,7 @@ typedef enum MTYPE{
 typedef struct Mutation{
 	MType type;
 
-	#if ACCMUT_STATIC_ANALYSIS_EVAL	
+	#if ACCMUT_STATIC_ANALYSIS_EVAL
 	int location;
 	#endif
 
@@ -72,8 +72,8 @@ typedef struct Mutation{
 	int sop;
 
 	//AOR,LOR->t_op
-	//LVR,ABV->index; 
-	int op_0;	
+	//LVR,ABV->index;
+	int op_0;
 
 	//ROR->s_pre & t_pre
 	//LVR->src_const & tar_const
@@ -83,6 +83,13 @@ typedef struct Mutation{
 	long op_1;
 	long op_2;
 }Mutation;
+
+typedef struct RegMutInfo {
+    Mutation *ptr;
+    int num;
+    int offset;
+    int isReg;
+} RegMutInfo;
 
 //extern struct _ACCMUT_FILE;
 

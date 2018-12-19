@@ -112,6 +112,7 @@ public:
 class STDMut : public Mutation{
 public:
 	int func_ty;
+	int retval;
 	STDMut() : Mutation(MK_STD){}
 	static bool classof(const Mutation *M) {
 		return M->getKind() == MK_STD;

@@ -7,6 +7,7 @@ extern "C"
     extern int default_active_set[];
     extern int forked_active_set[];
     extern int forked_active_num;
+    extern void __accmut__register(RegMutInfo *rmi);
 }
 
 #include <cstdio>
@@ -377,34 +378,47 @@ static RetType process_T_arith_GoodVar
 
 
 int32_t __accmut__process_i32_arith_GoodVar
-	(int32_t from, int32_t to, int32_t left, int32_t right,
+	(RegMutInfo *rmi, int32_t from, int32_t to, int32_t left, int32_t right,
 	 int32_t retId, int32_t leftId, int32_t rightId, int32_t op)
 {
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
+
 	return process_T_arith_GoodVar(from, to, left, right, retId, leftId, rightId, op, __accmut__cal_i32_arith);
 }
 
 
 int64_t __accmut__process_i64_arith_GoodVar
-	(int32_t from, int32_t to, int64_t left, int64_t right,
+	(RegMutInfo *rmi, int32_t from, int32_t to, int64_t left, int64_t right,
 	 int32_t retId, int32_t leftId, int32_t rightId, int32_t op)
 {
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 	return process_T_arith_GoodVar(from, to, left, right, retId, leftId, rightId, op, __accmut__cal_i64_arith);
 }
 
 
 int32_t __accmut__process_i32_cmp_GoodVar
-	(int32_t from, int32_t to, int32_t left, int32_t right,
+	(RegMutInfo *rmi, int32_t from, int32_t to, int32_t left, int32_t right,
 	 int32_t retId, int32_t leftId, int32_t rightId, int32_t pred)
 {
     assert(retId == BADVAR);
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
     return process_T_arith_GoodVar(from, to, left, right, retId, leftId, rightId, pred, __accmut__cal_i32_bool);
 }
 
 
 int32_t __accmut__process_i64_cmp_GoodVar
-	(int32_t from, int32_t to, int64_t left, int64_t right,
+	(RegMutInfo *rmi, int32_t from, int32_t to, int64_t left, int64_t right,
 	 int32_t retId, int32_t leftId, int32_t rightId, int32_t pred)
 {
     assert(retId == BADVAR);
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 	return process_T_arith_GoodVar(from, to, left, right, retId, leftId, rightId, pred, __accmut__cal_i64_bool);
 }

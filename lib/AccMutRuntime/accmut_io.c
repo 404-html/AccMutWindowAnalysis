@@ -166,7 +166,7 @@ int __accmut__feof(ACCMUT_FILE *fp){
     int result = (fp->flags & _IO_EOF_SEEN) != 0;
     return result;
 }
-/*
+
 int __accmut__fseek(ACCMUT_FILE *fp, size_t offset, int loc){
     //TODO
     return 0;
@@ -176,7 +176,7 @@ int __accmut__ferror(ACCMUT_FILE *fp){
     //TODO:
     return 0;
 }
-*/
+
 int __accmut__fileno(ACCMUT_FILE *fp){
     return fp->fd;
 }
@@ -282,7 +282,7 @@ int __accmut__getc(ACCMUT_FILE *fp){
 }
 
 size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
-    _IO_size_t bytes_requested = size * count;
+    ssize_t bytes_requested = size * count;
     if (bytes_requested == 0)
         return 0;
 

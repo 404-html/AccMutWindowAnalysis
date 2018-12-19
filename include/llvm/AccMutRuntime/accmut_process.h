@@ -1,6 +1,7 @@
 #ifndef ACCMUT_PROCESS_H
 #define ACCMUT_PROCESS_H
 
+#include "accmut_config.h"
 
 #define PAGESIZE (4096)
 
@@ -21,7 +22,7 @@ typedef struct PrepareCallParam{
 
 void __accmut__init(void);
 
-int __accmut__prepare_call(int from, int to, int opnum, ...);
+int __accmut__prepare_call(RegMutInfo *rmi, int from, int to, int opnum, ...);
 
 int __accmut__stdcall_i32(void);
 
@@ -31,17 +32,17 @@ void __accmut__stdcall_void(void);
 
 //char *__accmut__stdcall_pt();
 
-int __accmut__process_i32_arith(int from, int to, int left, int right);
+int __accmut__process_i32_arith(RegMutInfo *rmi, int from, int to, int left, int right);
 
-long __accmut__process_i64_arith(int from, int to, long left, long right);
+long __accmut__process_i64_arith(RegMutInfo *rmi, int from, int to, long left, long right);
 
-int __accmut__process_i32_cmp(int from, int to, int left, int right);
+int __accmut__process_i32_cmp(RegMutInfo *rmi, int from, int to, int left, int right);
 
-int __accmut__process_i64_cmp(int from, int to, long left, long right);
+int __accmut__process_i64_cmp(RegMutInfo *rmi, int from, int to, long left, long right);
 
-int __accmut__prepare_st_i32(int from, int to, int tobestore, int *addr);
+int __accmut__prepare_st_i32(RegMutInfo *rmi, int from, int to, int tobestore, int *addr);
 
-int __accmut__prepare_st_i64(int from, int to, long tobestore, long* addr);
+int __accmut__prepare_st_i64(RegMutInfo *rmi, int from, int to, long tobestore, long* addr);
 
 void __accmut__std_store(void);
 

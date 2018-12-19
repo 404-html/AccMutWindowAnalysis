@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file decribes the dynamic mutation analysis IR instrumenter pass
-// 
+//
 // Add by Wang Bo. OCT 21, 2015
 //
 //===----------------------------------------------------------------------===//
@@ -28,7 +28,7 @@ using namespace llvm;
 using namespace std;
 
 #define ERRMSG(msg) llvm::errs()<<(msg)<<" @ "<<__FILE__<<"->"<<__FUNCTION__<<"():"<<__LINE__<<"\n"
-		
+
 #define VALERRMSG(it,msg,cp) llvm::errs()<<"\tCUR_IT:\t"<<(*(it))<<"\n\t"<<(msg)<<":\t"<<(*(cp))<<"\n"
 
 DMAInstrumenter::DMAInstrumenter(/*Module *M*/) : FunctionPass(ID) {
@@ -53,22 +53,22 @@ static void test(Function &F){
 						*OI = (Value*) ld;
 					}
 				}
-						
+
 				Module* TheModule = F.getParent();
-				
+
 				Function* precallfunc = TheModule->getFunction("__accmut__prepare_call");
 				std::vector<Value*> params;
 				std::stringstream ss;
 				ss<<0;
-				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), 
-						APInt(32, StringRef(ss.str()), 10)); 
+				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
+						APInt(32, StringRef(ss.str()), 10));
 				params.push_back(from_i32);
 				ss.str("");
 				ss<<1;
 				ConstantInt* to_i32= ConstantInt::get(TheModule->getContext(),
 					APInt(32, StringRef(ss.str()), 10));
 				params.push_back(to_i32);
-	
+
 				std::bitset<64> signature;
 				unsigned char index = 0;
 				int record_num = 0;
@@ -84,8 +84,8 @@ static void test(Function &F){
 					short tp_and_idx = ((unsigned char)tp)<<8;
 					tp_and_idx = tp_and_idx | index;
 					ss<<tp_and_idx;
-					ConstantInt* ctai = ConstantInt::get(TheModule->getContext(), 
-						APInt(16, StringRef(ss.str()), 10)); 
+					ConstantInt* ctai = ConstantInt::get(TheModule->getContext(),
+						APInt(16, StringRef(ss.str()), 10));
 					params.push_back(ctai);
 					//now push the idx'th param
 					if(LoadInst *ld = dyn_cast<LoadInst>(&*OI)){//is a local var
@@ -99,20 +99,20 @@ static void test(Function &F){
 				//insert num of param-records
 				ss.str("");
 				ss<<record_num;
-				ConstantInt* rcd = ConstantInt::get(TheModule->getContext(), 
-						APInt(32, StringRef(ss.str()), 10)); 
+				ConstantInt* rcd = ConstantInt::get(TheModule->getContext(),
+						APInt(32, StringRef(ss.str()), 10));
 				params.insert( params.begin()+2 , rcd);
 
 				CallInst *pre = CallInst::Create(precallfunc, params, "", cur_it);
 
 				ConstantInt* zero = ConstantInt::get(Type::getInt32Ty(TheModule->getContext()), 0);
-			
+
 				ICmpInst *hasstd = new ICmpInst(cur_it, ICmpInst::ICMP_NE, pre, zero, "hasstd");
 
 				BasicBlock *cur_bb = cur_it->getParent();
-		
+
 				Instruction* oricall = cur_it->clone();
-				
+
 				BasicBlock* label_if_end = cur_bb->splitBasicBlock(cur_it, "if.end");
 
 				BasicBlock* label_if_then = BasicBlock::Create(TheModule->getContext(), "if.then",cur_bb->getParent(), label_if_end);
@@ -121,10 +121,10 @@ static void test(Function &F){
 				cur_bb->back().eraseFromParent();
 
 				BranchInst::Create(label_if_then, label_if_else, hasstd, cur_bb);
-					
+
 				//label_if_then
 				label_if_then->getInstList().push_back(oricall);
-				BranchInst::Create(label_if_end, label_if_then);	
+				BranchInst::Create(label_if_end, label_if_then);
 
 				//label_if_else
 				Function *std_handle;
@@ -138,7 +138,7 @@ static void test(Function &F){
 					llvm::errs()<<"ERR CALL TYPE @ "<<__FUNCTION__<<" : "<<__LINE__<<"\n";
 					exit(0);
 				}
-	
+
 				CallInst*  stdcall = CallInst::Create(std_handle, "", label_if_else);
 				stdcall->setCallingConv(CallingConv::C);
 				stdcall->setTailCall(false);
@@ -165,7 +165,7 @@ static void test(Function &F){
 			if(StoreInst* st = dyn_cast<StoreInst>(&*cur_it)){
 
 				Module* TheModule = F.getParent();
-				
+
 				if(ConstantInt* cons = dyn_cast<ConstantInt>(st->getValueOperand())){
 						AllocaInst *alloca = new AllocaInst(cons->getType(), 0, "cons_alias", st);
 						*/
@@ -186,19 +186,19 @@ static void test(Function &F){
 					ERRMSG("ERR STORE TYPE");
 					exit(0);
 				}
-				
+
 				std::vector<Value*> params;
 				std::stringstream ss;
 				ss<<0;
-				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), 
-						APInt(32, StringRef(ss.str()), 10)); 
+				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
+						APInt(32, StringRef(ss.str()), 10));
 				params.push_back(from_i32);
 				ss.str("");
 				ss<<1;
 				ConstantInt* to_i32= ConstantInt::get(TheModule->getContext(),
 					APInt(32, StringRef(ss.str()), 10));
 				params.push_back(to_i32);
-				
+
 				auto OI = st->op_begin() + 1;
 				if(LoadInst *ld = dyn_cast<LoadInst>(&*OI)){//is a local var
 					params.push_back(ld->getPointerOperand());
@@ -212,25 +212,25 @@ static void test(Function &F){
 				CallInst *pre = CallInst::Create(prestfunc, params, "", &*cur_it);
 
 				ConstantInt* zero = ConstantInt::get(Type::getInt32Ty(TheModule->getContext()), 0);
-			
+
 				ICmpInst *hasstd = new ICmpInst(&*cur_it, ICmpInst::ICMP_EQ, pre, zero, "hasstd");
-			
+
 				BasicBlock *cur_bb = cur_it->getParent();
-				
+
 				Instruction* orist = cur_it->clone();
-				
+
 				BasicBlock* label_if_end = cur_bb->splitBasicBlock(cur_it, "if.end");
-				
+
 				BasicBlock* label_if_then = BasicBlock::Create(TheModule->getContext(), "if.then",cur_bb->getParent(), label_if_end);
 				BasicBlock* label_if_else = BasicBlock::Create(TheModule->getContext(), "if.else",cur_bb->getParent(), label_if_end);
-				
+
 				cur_bb->back().eraseFromParent();
-				
+
 				BranchInst::Create(label_if_then, label_if_else, hasstd, cur_bb);
 
 				//label_if_then
 				label_if_then->getInstList().push_back(orist);
-				BranchInst::Create(label_if_end, label_if_then);	
+				BranchInst::Create(label_if_end, label_if_then);
 
 				//label_if_else
 				Function *std_handle = TheModule->getFunction("__accmut__std_store");
@@ -246,7 +246,7 @@ static void test(Function &F){
 				return;
 			}
 		}
-	}	
+	}
 }
 */
 
@@ -262,9 +262,122 @@ bool DMAInstrumenter::runOnFunction(Function & F){
 	MutUtil::getAllMutations(TheModule->getName());
 
 	vector<Mutation*>* v= MutUtil::AllMutsMap[F.getName()];
-	
+
 	if(v == NULL || v->size() == 0){
 		return false;
+	}
+
+	vector<Mutation*> &AllMutsVec = MutUtil::AllMutsVec;
+
+	if (firstTime) {
+		StructType *t = TheModule->getTypeByName("struct.Mutation");
+		if (t == nullptr) {
+		    t = StructType::create(
+		            TheModule->getContext(),
+		            {IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 64),
+                     IntegerType::get(TheModule->getContext(), 64)},
+                     "struct.Mutation");
+		}
+		std::vector<Constant *> vec;
+		vec.reserve(AllMutsVec.size());
+		for (uint64_t i = 0; i < AllMutsVec.size(); ++i) {
+			Mutation *mut = AllMutsVec[i];
+			int type = mut->getKind();
+			int sop = mut->src_op;
+			int op_0 = 0;
+			long op_1 = 0;
+			long op_2 = 0;
+			switch (type) {
+				case Mutation::MK_AOR:
+					op_0 = dyn_cast<AORMut>(mut)->tar_op;
+					break;
+				case Mutation::MK_LOR:
+					op_0 = dyn_cast<LORMut>(mut)->tar_op;
+					break;
+				case Mutation::MK_ROR:
+					op_1 = dyn_cast<RORMut>(mut)->src_pre;
+					op_2 = dyn_cast<RORMut>(mut)->tar_pre;
+					break;
+				case Mutation::MK_STD:
+					op_1 = dyn_cast<STDMut>(mut)->func_ty;
+					op_2 = dyn_cast<STDMut>(mut)->retval;
+					break;
+				case Mutation::MK_LVR:
+					op_0 = dyn_cast<LVRMut>(mut)->oper_index;
+					op_1 = dyn_cast<LVRMut>(mut)->src_const;
+					op_2 = dyn_cast<LVRMut>(mut)->tar_const;
+					break;
+				case Mutation::MK_UOI:
+					op_1 = dyn_cast<UOIMut>(mut)->oper_index;
+					op_2 = dyn_cast<UOIMut>(mut)->ury_tp;
+					break;
+				case Mutation::MK_ROV:
+					op_1 = dyn_cast<ROVMut>(mut)->op1;
+					op_2 = dyn_cast<ROVMut>(mut)->op2;
+					break;
+				case Mutation::MK_ABV:
+					op_0 = dyn_cast<ABVMut>(mut)->oper_index;
+					break;
+				default:
+					break;
+			}
+			vec.push_back((ConstantStruct::get(t, {
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), type, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), sop, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), op_0, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 64), op_1, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 64), op_2, true)
+			})));
+		}
+		ConstantArray *a = dyn_cast<ConstantArray>(ConstantArray::get(ArrayType::get(t, vec.size()),
+																	  ArrayRef<Constant *>(vec)));
+		GlobalVariable *gv1 = new GlobalVariable(
+				*TheModule,
+				ArrayType::get(t, vec.size()),
+				false, llvm::GlobalValue::LinkageTypes::InternalLinkage,
+				a,
+				"mutarray",
+				nullptr,
+				llvm::GlobalValue::ThreadLocalMode::NotThreadLocal,
+				0
+		);
+
+		regmutinfo = TheModule->getTypeByName("struct.RegMutInfo");
+		if (regmutinfo == nullptr) {
+		    regmutinfo = StructType::create(
+		            TheModule->getContext(),
+                    {PointerType::get(t, 0),
+					 IntegerType::get(TheModule->getContext(), 32),
+					 IntegerType::get(TheModule->getContext(), 32),
+					 IntegerType::get(TheModule->getContext(), 32)},
+					 "struct.RegMutInfo"
+		            );
+		}
+
+		Constant *gep = ConstantExpr::getInBoundsGetElementPtr(nullptr, gv1, ArrayRef<Constant *>({
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+		}));
+		ConstantStruct *rmi = dyn_cast<ConstantStruct>(ConstantStruct::get(regmutinfo, {
+			gep,
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), vec.size(), false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false)
+		}));
+		rmigv = new GlobalVariable(
+				*TheModule,
+				regmutinfo,
+				false, llvm::GlobalValue::LinkageTypes::InternalLinkage,
+				rmi,
+				"mutrmi",
+				nullptr,
+				llvm::GlobalValue::ThreadLocalMode::NotThreadLocal,
+				0
+				);
+		firstTime = false;
 	}
 
 	errs()<<"\n######## DMA INSTRUMTNTING MUT  @"<<TheModule->getName()<<"->"<<F.getName()<<"()  ########\n\n";
@@ -304,14 +417,14 @@ static int getTypeMacro(Type *t){
 				llvm::errs()<<*t<<'\n';
 				//exit(0);
 		}
-	}	
+	}
 	return res;
 }
 
 static bool isHandledCoveInst(Instruction *inst){
-	return inst->getOpcode() == Instruction::Trunc 
-		|| inst->getOpcode() == Instruction::ZExt 
-		|| inst->getOpcode() == Instruction::SExt 
+	return inst->getOpcode() == Instruction::Trunc
+		|| inst->getOpcode() == Instruction::ZExt
+		|| inst->getOpcode() == Instruction::SExt
 		|| inst->getOpcode() == Instruction::BitCast ;
 	// TODO:: PtrToInt, IntToPtr, AddrSpaceCast and float related Inst are not handled
 }
@@ -322,22 +435,22 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
 	if(tp < 0){
 		return false;
 	}
-	
+
 	std::stringstream ss;
 	//push type
 	ss.str("");
 	unsigned short tp_and_idx = ((unsigned short)tp)<<8;
 	tp_and_idx = tp_and_idx | (unsigned short)index;
 	ss<<tp_and_idx;
-	ConstantInt* c_t_a_i = ConstantInt::get(TheModule->getContext(), 
-		APInt(16, StringRef(ss.str()), 10)); 
+	ConstantInt* c_t_a_i = ConstantInt::get(TheModule->getContext(),
+		APInt(16, StringRef(ss.str()), 10));
 
 	//now push the pointer of idx'th param
 	if(LoadInst *ld = dyn_cast<LoadInst>(&*OI)){//is a local var
 		Value *ptr_of_ld = ld->getPointerOperand();
 		//if the pointer of loadInst dose not point to an integer
 		if(SequentialType *t = dyn_cast<SequentialType>(ptr_of_ld->getType())){
-			if(! t->getElementType()->isIntegerTy()){// TODO: for i32** 
+			if(! t->getElementType()->isIntegerTy()){// TODO: for i32**
 				ERRMSG("WARNNING ! Trying to push a none-i32* !! ");
 				return false;
 			}
@@ -358,7 +471,7 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
 		Value *v = dyn_cast<Value>(&*OI);
 		llvm::errs()<<"\tCUR_OPREAND:\t";
 		// v->dump();
-		exit(0);					
+		exit(0);
 	}
 	return true;
 }
@@ -366,7 +479,7 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
 void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 
 	int instrumented_insts = 0;
-	
+
 	//BasicBlock *cur_bb;
 	BasicBlock::iterator cur_it;
 
@@ -384,7 +497,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				break;
 			}
 		}
-		
+
 		cur_it =  getLocation(F, instrumented_insts, tmp[0]->index);
 
 		//cur_bb = cur_it->getParent();
@@ -399,10 +512,10 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				<<mut_from<<"\tTO: "<<mut_to<<")\t"<<*cur_it<<"\n";
 			exit(0);
 		}
-		
+
 		llvm::errs()<<"CUR_INST: "<<tmp.front()->index<<"\t(FROM: "
 			<<mut_from<<"\tTO: "<<mut_to<<")\t"<<*cur_it<<"\n";
-		
+
 		if(dyn_cast<CallInst>(&*cur_it)){
 			//move all constant literal and SSA value to repalce to alloca, e.g foo(a+5)->b = a+5;foo(b)
 			for (auto OI = cur_it->op_begin(), OE = cur_it->op_end(); OI != OE; ++OI){
@@ -414,8 +527,8 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					instrumented_insts += 3;//add 'alloca', 'store' and 'load'
 				}
 				else if(Instruction* oinst = dyn_cast<Instruction>(&*OI)){
-					if(oinst->isBinaryOp() || 
-						(oinst->getOpcode() == Instruction::Call) || 
+					if(oinst->isBinaryOp() ||
+						(oinst->getOpcode() == Instruction::Call) ||
 						isHandledCoveInst(oinst) ||
 						(oinst->getOpcode() == Instruction::PHI) ||
 						(oinst->getOpcode() == Instruction::Select) ){
@@ -424,25 +537,26 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 						LoadInst *ld = new LoadInst(alloca, (oinst->getName().str()+".ld"), &*cur_it);
 						*OI = (Value*) ld;
 						instrumented_insts += 3;
-						
+
 					}
 				}
-				
+
 			}
 
 			Function* precallfunc = TheModule->getFunction("__accmut__prepare_call");
 
 			if (!precallfunc) {
-				std::vector<Type*>FuncTy_3_args;
-				FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-				FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-				FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-				FunctionType* FuncTy_3 = FunctionType::get(
+				std::vector<Type*>FuncTy_4_args;
+                FuncTy_4_args.push_back(PointerType::get(regmutinfo, 0));
+				FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+				FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+				FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+				FunctionType* FuncTy_4 = FunctionType::get(
 				/*Result=*/IntegerType::get(TheModule->getContext(), 32),
-				/*Params=*/FuncTy_3_args,
+				/*Params=*/FuncTy_4_args,
 				/*isVarArg=*/true);
 				precallfunc = Function::Create(
-										 /*Type=*/FuncTy_3,
+										 /*Type=*/FuncTy_4,
 										 /*Linkage=*/GlobalValue::ExternalLinkage,
 										 /*Name=*/"__accmut__prepare_call", TheModule); // (external, no body)
 				precallfunc->setCallingConv(CallingConv::C);
@@ -455,19 +569,20 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 			   AttrBuilder B;
 			   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 			  }
-			 
+
 			 Attrs.push_back(PAS);
 			 func___accmut__prepare_call_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-			 
+
 			}
 			precallfunc->setAttributes(func___accmut__prepare_call_PAL);
 
-			
+
 			std::vector<Value*> params;
+            params.push_back(rmigv);
 			std::stringstream ss;
 			ss<<mut_from;
-			ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), 
-					APInt(32, StringRef(ss.str()), 10)); 
+			ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
+					APInt(32, StringRef(ss.str()), 10));
 			params.push_back(from_i32);
 			ss.str("");
 			ss<<mut_to;
@@ -478,14 +593,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 			int index = 0;
 			int record_num = 0;
 			std::vector<int> pushed_param_idx;
-			
+
 			//get signature info
 			for (auto OI = cur_it->op_begin(), OE = cur_it->op_end() - 1; OI != OE; ++OI, ++index){
 
 				Value *v = dyn_cast<Value>(&*OI);
 				bool succ = pushPreparecallParam(params, index, v, TheModule);
 
-				if(succ){					
+				if(succ){
 					pushed_param_idx.push_back(index);
 					record_num++;
 				}
@@ -503,37 +618,37 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				}
 				llvm::errs()<<"\n";
 			}
-			
+
 			//insert num of param-records
 			ss.str("");
 			ss<<record_num;
-			ConstantInt* rcd = ConstantInt::get(TheModule->getContext(), 
-					APInt(32, StringRef(ss.str()), 10)); 
-			params.insert( params.begin()+2 , rcd);
+			ConstantInt* rcd = ConstantInt::get(TheModule->getContext(),
+					APInt(32, StringRef(ss.str()), 10));
+			params.insert( params.begin()+3 , rcd);
 
 			CallInst *pre = CallInst::Create(precallfunc, params, "", &*cur_it);
 			pre->setCallingConv(CallingConv::C);
 			pre->setTailCall(false);
 			AttributeList preattrset;
 			pre->setAttributes(preattrset);
-			
+
 			ConstantInt* zero = ConstantInt::get(Type::getInt32Ty(TheModule->getContext()), 0);
-			
+
 			ICmpInst *hasstd = new ICmpInst(&*cur_it, ICmpInst::ICMP_EQ, pre, zero, "hasstd.call");
-			
+
 			BasicBlock *cur_bb = cur_it->getParent();
-			
+
 			Instruction* oricall = cur_it->clone();
-			
+
 			BasicBlock* label_if_end = cur_bb->splitBasicBlock(cur_it, "stdcall.if.end");
-			
+
 			BasicBlock* label_if_then = BasicBlock::Create(TheModule->getContext(), "stdcall.if.then",cur_bb->getParent(), label_if_end);
 			BasicBlock* label_if_else = BasicBlock::Create(TheModule->getContext(), "stdcall.if.else",cur_bb->getParent(), label_if_end);
-			
+
 			cur_bb->back().eraseFromParent();
-			
+
 			BranchInst::Create(label_if_then, label_if_else, hasstd, cur_bb);
-				
+
 			//label_if_then
 			//move the loadinsts of params into if_then_block
 			index = 0;
@@ -543,7 +658,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				if(find(pushed_param_idx.begin(), pushed_param_idx.end(), index) == pushed_param_idx.end()){
 					continue;
 				}
-				
+
 				if(LoadInst *ld = dyn_cast<LoadInst>(&*OI)){
 					ld->removeFromParent();
 					label_if_then->getInstList().push_back(ld);
@@ -576,12 +691,12 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 						Value *v = dyn_cast<Value>(&*OI);
 						VALERRMSG(cur_it,"CUR_OPRAND",v);
 						exit(0);
-					}						
+					}
 				}
 			}
 			label_if_then->getInstList().push_back(oricall);
-			BranchInst::Create(label_if_end, label_if_then);	
-			
+			BranchInst::Create(label_if_end, label_if_then);
+
 			//label_if_else
 			Function *std_handle;
 			if(oricall->getType()->isIntegerTy(32)){
@@ -607,14 +722,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					AttrBuilder B;
 					PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 				   }
-				  
+
 				  Attrs.push_back(PAS);
 				  func___accmut__stdcall_i32_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-				  
+
 				 }
 				 std_handle->setAttributes(func___accmut__stdcall_i32_PAL);
 
-				
+
 			}else if(oricall->getType()->isIntegerTy(64)){
 				std_handle = TheModule->getFunction("__accmut__stdcall_i64");
 				if (!std_handle) {
@@ -637,14 +752,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				   AttrBuilder B;
 				   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 				  }
-				 
+
 				 Attrs.push_back(PAS);
 				 func___accmut__stdcall_i64_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-				 
+
 				}
 				std_handle->setAttributes(func___accmut__stdcall_i64_PAL);
 
-				
+
 			}else if(oricall->getType()->isVoidTy()){
 				std_handle = TheModule->getFunction("__accmut__stdcall_void");
 				if (!std_handle) {
@@ -669,13 +784,13 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					   AttrBuilder B;
 					   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 					  }
-					 
+
 					 Attrs.push_back(PAS);
 					 func___accmut__stdcall_void_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-					 
+
 					}
 					std_handle->setAttributes(func___accmut__stdcall_void_PAL);
-				
+
 			}else{
 				ERRMSG("ERR CALL TYPE ");
 				// oricall->dump();
@@ -683,14 +798,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				exit(0);
 			}//}else if(oricall->getType()->isPointerTy()){
 
-			
+
 			CallInst*  stdcall = CallInst::Create(std_handle, "", label_if_else);
 			stdcall->setCallingConv(CallingConv::C);
 			stdcall->setTailCall(false);
 			AttributeList stdcallPAL;
 			stdcall->setAttributes(stdcallPAL);
 			BranchInst::Create(label_if_end, label_if_else);
-			
+
 			//label_if_end
 			if(oricall->getType()->isVoidTy()){
 				cur_it->eraseFromParent();
@@ -705,7 +820,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 			}
 
 		}
-		
+
 		else if(StoreInst* st = dyn_cast<StoreInst>(&*cur_it)){
 			// TODO:: add or call inst?
 			if(ConstantInt* cons = dyn_cast<ConstantInt>(st->getValueOperand())){
@@ -722,13 +837,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				prestfunc = TheModule->getFunction("__accmut__prepare_st_i32");
 				if(!prestfunc){
 					PointerType* PointerTy_1 = PointerType::get(IntegerType::get(TheModule->getContext(), 32), 0);
-					std::vector<Type*> FuncTy_4_args;
-					FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-					FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-					FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-					FuncTy_4_args.push_back(PointerTy_1);
+					std::vector<Type*> FuncTy_5_args;
+                    FuncTy_5_args.push_back(PointerType::get(regmutinfo, 0));
+					FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+					FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+					FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
+					FuncTy_5_args.push_back(PointerTy_1);
 					FunctionType* f_tp = FunctionType::get(IntegerType::get(TheModule->getContext(), 32),
-						FuncTy_4_args, false);
+						FuncTy_5_args, false);
 					prestfunc = Function::Create(f_tp, GlobalValue::ExternalLinkage,
 									"__accmut__prepare_st_i32", TheModule); // (external, no body)
  					prestfunc->setCallingConv(CallingConv::C);
@@ -747,8 +863,8 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					prestfunc_PAL = AttributeList::get(TheModule->getContext(), Attrs);
 
 				}
-				prestfunc->setAttributes(prestfunc_PAL);				
-				
+				prestfunc->setAttributes(prestfunc_PAL);
+
 			}
 			else if(st->getValueOperand()->getType()->isIntegerTy(64)){
 				prestfunc = TheModule->getFunction("__accmut__prepare_st_i64");
@@ -757,15 +873,16 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					PointerType* PointerTy_2 = PointerType::get(IntegerType::get(TheModule->getContext(), 64), 0);
 
 					std::vector<Type*>FuncTy_6_args;
+                    FuncTy_6_args.push_back(PointerType::get(regmutinfo, 0));
 					FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 					FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 					FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 64));
 					FuncTy_6_args.push_back(PointerTy_2);
 					FunctionType* FuncTy_6 = FunctionType::get(IntegerType::get(TheModule->getContext(), 32),
 					 						FuncTy_6_args, false);
-					
 
-					
+
+
 					prestfunc =  Function::Create(FuncTy_6, GlobalValue::ExternalLinkage,
  								"__accmut__prepare_st_i64", TheModule);
 					prestfunc->setCallingConv(CallingConv::C);
@@ -779,26 +896,27 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				   AttrBuilder B;
 				   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 				  }
-				 
+
 				 Attrs.push_back(PAS);
 				 pal = AttributeList::get(TheModule->getContext(), Attrs);
-				 
+
 				}
 				prestfunc->setAttributes(pal);
 
-			
+
 			}else{
 				ERRMSG("ERR STORE TYPE ");
 				VALERRMSG(cur_it, "CUR_TYPE", st->getValueOperand()->getType());
 				exit(0);
 			}
 
-			
+
 			std::vector<Value*> params;
+            params.push_back(rmigv);
 			std::stringstream ss;
 			ss<<mut_from;
-			ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), 
-					APInt(32, StringRef(ss.str()), 10)); 
+			ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
+					APInt(32, StringRef(ss.str()), 10));
 			params.push_back(from_i32);
 			ss.str("");
 			ss<<mut_to;
@@ -808,7 +926,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 
 			Value* tobestored = dyn_cast<Value>(st->op_begin());
 			params.push_back(tobestored);
-			
+
 			auto addr = st->op_begin() + 1;// the pointer of the storeinst
 			if(LoadInst *ld = dyn_cast<LoadInst>(&*addr)){//is a local var
 				params.push_back(ld);
@@ -832,17 +950,17 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 			pre->setAttributes(attrset);
 
 			ConstantInt* zero = ConstantInt::get(Type::getInt32Ty(TheModule->getContext()), 0);
-		
+
 			ICmpInst *hasstd = new ICmpInst(&*cur_it, ICmpInst::ICMP_EQ, pre, zero, "hasstd.st");
-		
+
 			BasicBlock *cur_bb = cur_it->getParent();
-						
+
 			BasicBlock* label_if_end = cur_bb->splitBasicBlock(cur_it, "stdst.if.end");
-			
+
 			BasicBlock* label_if_else = BasicBlock::Create(TheModule->getContext(), "std.st",cur_bb->getParent(), label_if_end);
-			
+
 			cur_bb->back().eraseFromParent();
-			
+
 			BranchInst::Create(label_if_end, label_if_else, hasstd, cur_bb);
 
 
@@ -870,9 +988,9 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				func___accmut__std_store_PAL = AttributeList::get(TheModule->getContext(), Attrs);
 
 			}
-			std_handle->setAttributes(func___accmut__std_store_PAL);		
+			std_handle->setAttributes(func___accmut__std_store_PAL);
 
-			
+
 			CallInst*  stdcall = CallInst::Create(std_handle, "", label_if_else);
 			stdcall->setCallingConv(CallingConv::C);
 			stdcall->setTailCall(false);
@@ -881,13 +999,13 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 			BranchInst::Create(label_if_end, label_if_else);
 
 			//label_if_end
-			cur_it->eraseFromParent();	
+			cur_it->eraseFromParent();
 			instrumented_insts += 4;
 		}
 		else{
 			// FOR ARITH INST
-			if(cur_it->getOpcode() >= Instruction::Add && 
-				cur_it->getOpcode() <= Instruction::Xor){ 
+			if(cur_it->getOpcode() >= Instruction::Add &&
+				cur_it->getOpcode() <= Instruction::Xor){
 				Type* ori_ty = cur_it->getType();
 				Function* f_process;
 				if(ori_ty->isIntegerTy(32)){
@@ -895,11 +1013,12 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 
 					if (!f_process) {
 						std::vector<Type*>ftp_args;
+                        ftp_args.push_back(PointerType::get(regmutinfo, 0));
 						ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
-						FunctionType* ftp = FunctionType::get(IntegerType::get(TheModule->getContext(), 32), ftp_args, false);						
+						FunctionType* ftp = FunctionType::get(IntegerType::get(TheModule->getContext(), 32), ftp_args, false);
 						f_process = Function::Create(ftp, GlobalValue::ExternalLinkage,
 						 				"__accmut__process_i32_arith", TheModule); // (external, no body)
 						f_process->setCallingConv(CallingConv::C);
@@ -922,6 +1041,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					f_process = TheModule->getFunction("__accmut__process_i64_arith");
 
 					std::vector<Type*> ftp_args;
+                    ftp_args.push_back(PointerType::get(regmutinfo, 0));
 					ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 					ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 					ftp_args.push_back(IntegerType::get(TheModule->getContext(), 64));
@@ -939,12 +1059,12 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					   AttrBuilder B;
 					   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 					  }
-					 
+
 					 Attrs.push_back(PAS);
 					 pal = AttributeList::get(TheModule->getContext(), Attrs);
-					 
+
 					}
-					f_process->setAttributes(pal);			
+					f_process->setAttributes(pal);
 				}else{
 					ERRMSG("ArithInst TYPE ERROR ");
 					// cur_it->dump();
@@ -954,9 +1074,10 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				}
 
 				std::vector<Value*> int_call_params;
+                int_call_params.push_back(rmigv);
 				std::stringstream ss;
 				ss<<mut_from;
-				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), APInt(32, StringRef(ss.str()), 10)); 
+				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), APInt(32, StringRef(ss.str()), 10));
 				int_call_params.push_back(from_i32);
 				ss.str("");
 				ss<<mut_to;
@@ -967,18 +1088,19 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				CallInst *call = CallInst::Create(f_process, int_call_params);
 				ReplaceInstWithInst(&*cur_it, call);
 
-				
+
 			}
 			// FOR ICMP INST
 			else if(cur_it->getOpcode() == Instruction::ICmp){
 				Function* f_process;
-				
+
 				if(cur_it->getOperand(0)->getType()->isIntegerTy(32)){
 					f_process = TheModule->getFunction("__accmut__process_i32_cmp");
 
 					if (!f_process) {
-						
+
 						std::vector<Type*>FuncTy_3_args;
+                        FuncTy_3_args.push_back(PointerType::get(regmutinfo, 0));
 						FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
@@ -987,7 +1109,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 						 /*Result=*/IntegerType::get(TheModule->getContext(), 32),
 						 /*Params=*/FuncTy_3_args,
 						 /*isVarArg=*/false);
-						
+
 						f_process = Function::Create(
 						 /*Type=*/FuncTy_3,
 						 /*Linkage=*/GlobalValue::ExternalLinkage,
@@ -1002,19 +1124,20 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					   AttrBuilder B;
 					   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 					  }
-					 
+
 					 Attrs.push_back(PAS);
 					 func___accmut__process_i32_cmp_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-					 
+
 					}
 					f_process->setAttributes(func___accmut__process_i32_cmp_PAL);
-					
+
 				}else if(cur_it->getOperand(0)->getType()->isIntegerTy(64)){
 					f_process = TheModule->getFunction("__accmut__process_i64_cmp");
 
 					if (!f_process) {
 
 						std::vector<Type*>FuncTy_5_args;
+                        FuncTy_5_args.push_back(PointerType::get(regmutinfo, 0));
 						FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
 						FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 64));
@@ -1024,7 +1147,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 						 /*Params=*/FuncTy_5_args,
 						 /*isVarArg=*/false);
 
-						
+
 						f_process = Function::Create(
 						 /*Type=*/FuncTy_5,
 						 /*Linkage=*/GlobalValue::ExternalLinkage,
@@ -1039,23 +1162,24 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					   AttrBuilder B;
 					   PAS = AttributeList::get(TheModule->getContext(), ~0U, B);
 					  }
-					 
+
 					 Attrs.push_back(PAS);
 					 func___accmut__process_i64_cmp_PAL = AttributeList::get(TheModule->getContext(), Attrs);
-					 
+
 					}
 					f_process->setAttributes(func___accmut__process_i64_cmp_PAL);
-					
+
 				}else{
-					ERRMSG("ICMP TYPE ERROR ");	
+					ERRMSG("ICMP TYPE ERROR ");
 					exit(0);
 				}
-				
+
 				std::vector<Value*> int_call_params;
+                int_call_params.push_back(rmigv);
 				std::stringstream ss;
 				ss<<mut_from;
-				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), 
-						APInt(32, StringRef(ss.str()), 10)); 
+				ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
+						APInt(32, StringRef(ss.str()), 10));
 				int_call_params.push_back(from_i32);
 				ss.str("");
 				ss<<mut_to;
@@ -1068,11 +1192,11 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 				CastInst* i32_conv = new TruncInst(call, IntegerType::get(TheModule->getContext(), 1), "");
 
 				instrumented_insts++;
-				
+
 				ReplaceInstWithInst(&*cur_it, i32_conv);
 			}
 		}
-		
+
 	}
 }
 

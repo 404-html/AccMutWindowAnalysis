@@ -35,7 +35,7 @@ extern Mutation* ALLMUTS[MAXMUTNUM + 1];
 #define __real_fprintf fprintf
 
 
-#define MMPL 64 //MAX MUT NUM PER LOCATION 
+#define MMPL 64 //MAX MUT NUM PER LOCATION
 
 /****** switch on for divide eq cls *******/
 //#ifndef USING_DIVIDE
@@ -64,7 +64,7 @@ static int eq_num;
 
 #undef MMPL
 
-// Algorithms for Dynamic mutation anaylsis 
+// Algorithms for Dynamic mutation anaylsis
 
 void __accmut__filter__variant(int from, int to) {
     recent_num = 0;
@@ -117,7 +117,7 @@ void __accmut__divide__eqclass_cmp(int onlyhas_0, int onlyhas_1) {
         eq_num = 1;
         return;
     }else if(onlyhas_1 == 1){
-        
+
         eqclass[0].num = 0;
         eqclass[0].value = 1;
 
@@ -207,7 +207,7 @@ void __accmut__divide__eqclass() {
         long result = temp_result[i];
         int j;
         int flag = 0;
-        
+
         #if USING_DIVIDE
         for(j = 0; j < eq_num; ++j) {
             if(eqclass[j].value == result) {
@@ -217,7 +217,7 @@ void __accmut__divide__eqclass() {
             }
         }
         #endif
-        
+
         if (flag == 0) {
             eqclass[eq_num].value = result;
             eqclass[eq_num].num = 1;
@@ -256,7 +256,7 @@ long __accmut__fork__eqclass(int from, int to) {
     int result = eqclass[0].value;
     int id = eqclass[0].mut_id[0];
     int i;
-    
+
     /** fork **/
     for(i = 1; i < eq_num; ++i) {
 
@@ -276,7 +276,7 @@ long __accmut__fork__eqclass(int from, int to) {
          if(pid == 0) {
 
             int r1 = setitimer(ITIMER_REAL, &ACCMUT_REAL_TICK, NULL);
-            int r2 = setitimer(ITIMER_PROF, &ACCMUT_PROF_TICK, NULL); 
+            int r2 = setitimer(ITIMER_PROF, &ACCMUT_PROF_TICK, NULL);
 
             // printf("REAL: %ld, PROF: %ld\n", ACCMUT_REAL_TICK.it_value.tv_usec,  ACCMUT_REAL_TICK.it_interval.tv_usec);
 
@@ -361,11 +361,11 @@ extern int MUT_NUM;
 void __accmut__init(){
 
     gettimeofday(&tv_begin, NULL);
-    
+
     atexit(__accmut__exit_time);
 
     __accmut__sepcific_timer();
-    
+
     __accmut__set_sig_handlers();
 
     #if 0
@@ -377,17 +377,37 @@ void __accmut__init(){
         exit(ENV_ERR);
     }
 
+    /*
     __accmut__load_all_muts();
+
 
     int i;
     for(i = 0; i <= MUT_NUM; ++i){
         default_active_set[i] = 1;
+    }*/
+    default_active_set[0] = 1;
+}
+
+void __accmut__register(RegMutInfo *rmi) {
+    if (rmi->isReg)
+        return;
+    rmi->isReg = 1;
+    rmi->offset = MUT_NUM;
+    int i;
+    for (i = 1; i <= rmi->num; ++i) {
+        ALLMUTS[i + MUT_NUM] = rmi->ptr + i - 1;
+        default_active_set[i + MUT_NUM] = 1;
     }
+    MUT_NUM += rmi->num;
 }
 
 
 /**************************** ARITH ***************************************/
-int __accmut__process_i32_arith(int from, int to, int left, int right){
+int __accmut__process_i32_arith(RegMutInfo *rmi, int from, int to, int left, int right){
+
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
 	int ori = __accmut__cal_i32_arith(ALLMUTS[to]->sop , left, right);
 
@@ -460,7 +480,7 @@ int __accmut__process_i32_arith(int from, int to, int left, int right){
                     mut_res = __accmut__cal_i32_arith(m->sop, left, abs(right) );
                 }
                 break;
-            }       
+            }
             case AOR:
             case LOR:
             {
@@ -501,7 +521,11 @@ int __accmut__process_i32_arith(int from, int to, int left, int right){
 
 }// end __accmut__process_i32_arith
 
-long __accmut__process_i64_arith(int from, int to, long left, long right){
+long __accmut__process_i64_arith(RegMutInfo *rmi, int from, int to, long left, long right){
+
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
 	long ori = __accmut__cal_i64_arith(ALLMUTS[to]->sop , left, right);
 
@@ -570,7 +594,7 @@ long __accmut__process_i64_arith(int from, int to, long left, long right){
                     mut_res = __accmut__cal_i64_arith(m->sop, left, labs(right) );
                 }
                 break;
-            }       
+            }
             case AOR:
             case LOR:
             {
@@ -605,7 +629,10 @@ long __accmut__process_i64_arith(int from, int to, long left, long right){
 
 
 /**************************** ICMP ***************************************/
-int __accmut__process_i32_cmp(int from, int to, int left, int right){
+int __accmut__process_i32_cmp(RegMutInfo *rmi, int from, int to, int left, int right){
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
     int s_pre = ALLMUTS[to]->op_1;
 
@@ -628,22 +655,22 @@ int __accmut__process_i32_cmp(int from, int to, int left, int right){
     // generate recent_set
     int onlyhas_1 = 1;
     int onlyhas_0 = 0;
-    
+
     int i;
     for(i = 0; i < recent_num; ++i){
         if(recent_set[i] == 0) {
             temp_result[i] = ori;
-            
+
             onlyhas_1 &= ori;
             onlyhas_0 |= ori;
-            
+
             continue;
         }
 
         Mutation *m = ALLMUTS[recent_set[i]];
         int mut_res;
 
-        switch(m->type){        
+        switch(m->type){
             case LVR:
             {
                 if(m->op_0 == 0){
@@ -681,7 +708,7 @@ int __accmut__process_i32_cmp(int from, int to, int left, int right){
                         exit(MUT_TP_ERR);
                     }
                     mut_res = __accmut__cal_i32_bool(s_pre, left, u_right);
-                }           
+                }
                 break;
             }
             case ROV:
@@ -707,9 +734,9 @@ int __accmut__process_i32_cmp(int from, int to, int left, int right){
                 ERRMSG("m->type ERR ");
                 exit(MUT_TP_ERR);
         }//end switch
-        
+
         temp_result[i] = mut_res;
-        
+
         onlyhas_1 &= mut_res;
         onlyhas_0 |= mut_res;
     }//end for i
@@ -734,7 +761,10 @@ int __accmut__process_i32_cmp(int from, int to, int left, int right){
     return result;
 }//end __accmut__process_i32_cmp
 
-int __accmut__process_i64_cmp(int from, int to, long left, long right){
+int __accmut__process_i64_cmp(RegMutInfo *rmi, int from, int to, long left, long right){
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
     int s_pre = ALLMUTS[to]->op_1;
 
@@ -743,25 +773,25 @@ int __accmut__process_i64_cmp(int from, int to, long left, long right){
     __accmut__filter__variant(from, to);
 
     // generate recent_set
-    
+
     int onlyhas_1 = 1;
     int onlyhas_0 = 0;
-    
+
     int i;
     for(i = 0; i < recent_num; ++i){
         if(recent_set[i] == 0) {
             temp_result[i] = ori;
-            
+
             onlyhas_1 &= ori;
             onlyhas_0 |= ori;
-            
+
             continue;
         }
 
         Mutation *m = ALLMUTS[recent_set[i]];
         int mut_res;
 
-        switch(m->type){        
+        switch(m->type){
             case LVR:
             {
                 if(m->op_0 == 0){
@@ -777,7 +807,7 @@ int __accmut__process_i64_cmp(int from, int to, long left, long right){
                     long u_left;
                     if(m->op_2 == 0){
                         u_left = left + 1;
-                    }else if(m->op_2 == 1){  
+                    }else if(m->op_2 == 1){
                         u_left = left - 1;
                     }else if(m->op_2 == 2){
                         u_left = 0 - left;
@@ -799,7 +829,7 @@ int __accmut__process_i64_cmp(int from, int to, long left, long right){
                         exit(MUT_TP_ERR);
                     }
                     mut_res = __accmut__cal_i64_bool(s_pre, left, u_right);
-                }       
+                }
                 break;
             }
             case ROV:
@@ -825,9 +855,9 @@ int __accmut__process_i64_cmp(int from, int to, long left, long right){
                 ERRMSG("m->type ERR ");
                 exit(MUT_TP_ERR);
         }//end switch
-        
+
         temp_result[i] = mut_res;
-        
+
 		onlyhas_1 &= mut_res;
         onlyhas_0 |= mut_res;
 
@@ -846,7 +876,7 @@ int __accmut__process_i64_cmp(int from, int to, long left, long right){
     #else
         __accmut__divide__eqclass();
     #endif
-    
+
     /* fork */
     int result = __accmut__fork__eqclass(from, to);
 
@@ -883,7 +913,7 @@ int __accmut__apply_call_mut(Mutation* m, PrepareCallParam params[]){
                     int *ptr = (int *) params[idx].address;
                     *ptr = m->op_2;
                     break;
-                }   
+                }
                 case LONG_TP:
                 {
                     long *ptr = (long *) params[idx].address;
@@ -939,7 +969,7 @@ int __accmut__apply_call_mut(Mutation* m, PrepareCallParam params[]){
                         *ptr = 0 - *ptr;
                     }
                     break;
-                }       
+                }
                 case LONG_TP:
                 {
                     long *ptr = (long *) params[idx].address;
@@ -1143,12 +1173,12 @@ int __accmut__apply_call_mut(Mutation* m, PrepareCallParam params[]){
                             ERRMSG("ERR ROV params[idx2].type ");
                             exit(MUT_TP_ERR);
                         }
-                    }//end switch(params[idx2].type)                
+                    }//end switch(params[idx2].type)
                     break;
                 }
                 default:
                 {
-                    ERRMSG("ERR ROV params[idx1].type "); 
+                    ERRMSG("ERR ROV params[idx1].type ");
                     exit(MUT_TP_ERR);
                 }
             }//end switch(params[idx1].type)
@@ -1163,7 +1193,7 @@ int __accmut__apply_call_mut(Mutation* m, PrepareCallParam params[]){
                 {
                     char *ptr = (char *) params[idx].address;
                     *ptr = abs(*ptr);
-                    break;                  
+                    break;
                 }
                 case SHORT_TP:
                 {
@@ -1206,7 +1236,10 @@ int __accmut__apply_call_mut(Mutation* m, PrepareCallParam params[]){
 * must fellow the type seq: (i8 type, i8 index, i64* ptr ...)
 * not std ->return 0 , std -> return 1
 */
-int __accmut__prepare_call(int from, int to, int opnum, ...){
+int __accmut__prepare_call(RegMutInfo *rmi, int from, int to, int opnum, ...){
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
 
     /*fprintf(stderr, "prepare begin\n");
@@ -1283,7 +1316,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
                             mut_res = 0;
                         }
                         break;
-                    }       
+                    }
                     case LONG_TP:
                     {
                         long *ptr = (long *) params[idx].address;
@@ -1324,7 +1357,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
                                 short *ptr2 = (short *) params[idx2].address;
                                 if(*ptr1 == *ptr2){
                                     mut_res = 0;
-                                }                            
+                                }
                                 break;
                             }
                             case INT_TP:
@@ -1373,7 +1406,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
 
                                 if(*ptr1 == *ptr2){
                                     mut_res = 0;
-                                }                                 
+                                }
                                 break;
                             }
                             case INT_TP:
@@ -1480,7 +1513,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
 
                                 if(*ptr1 == *ptr2){
                                     mut_res = 0;
-                                }                                    
+                                }
                                 break;
                             }
                             case LONG_TP:
@@ -1497,7 +1530,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
                                 ERRMSG("ROV params[idx2].type ");
                                 exit(MUT_TP_ERR);
                             }
-                        }//end switch(params[idx2].type)                
+                        }//end switch(params[idx2].type)
                         break;
                     }
                     default:
@@ -1519,7 +1552,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
                         if(*ptr >= 0){
                             mut_res = 0;
                         }
-                        break;                  
+                        break;
                     }
                     case SHORT_TP:
                     {
@@ -1572,7 +1605,7 @@ int __accmut__prepare_call(int from, int to, int opnum, ...){
         if(MUTATION_ID < from || MUTATION_ID > to){
             return 0;
         }
-        
+
         int tmpmid = temp_result[0];    //TODO :: CHECK !
 
         // printf("MID %d tmpmid %d\n", MUTATION_ID, tmpmid);
@@ -1679,7 +1712,10 @@ int __accmut__apply_store_mut(Mutation*m , long tobestore, unsigned long addr, i
     return 0;
 }
 
-int __accmut__prepare_st_i32(int from, int to, int tobestore, int *addr){
+int __accmut__prepare_st_i32(RegMutInfo *rmi, int from, int to, int tobestore, int *addr){
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
 
     __accmut__filter__variant(from, to);
 
@@ -1731,7 +1767,7 @@ int __accmut__prepare_st_i32(int from, int to, int tobestore, int *addr){
             *addr = tobestore;
             return 0;
         }
-        
+
         int tmpmid = temp_result[0];
 
         m = ALLMUTS[tmpmid];
@@ -1781,8 +1817,11 @@ int __accmut__prepare_st_i32(int from, int to, int tobestore, int *addr){
 }
 
 
-int __accmut__prepare_st_i64(int from, int to, long tobestore, long *addr){
-    
+int __accmut__prepare_st_i64(RegMutInfo *rmi, int from, int to, long tobestore, long *addr){
+    __accmut__register(rmi);
+    from += rmi->offset;
+    to += rmi->offset;
+
     __accmut__filter__variant(from, to);
 
     Mutation *m;
@@ -1837,7 +1876,7 @@ int __accmut__prepare_st_i64(int from, int to, long tobestore, long *addr){
             *addr = tobestore;
             return 0;
         }
-        
+
         int tmpmid = temp_result[0];
 
         m = ALLMUTS[tmpmid];

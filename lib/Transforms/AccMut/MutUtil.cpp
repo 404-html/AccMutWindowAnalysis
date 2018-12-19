@@ -12,6 +12,7 @@ using namespace std;
 
 bool MutUtil::allMutsGeted = false;
 map<string, vector<Mutation*>*> MutUtil::AllMutsMap;
+vector<Mutation*> MutUtil::AllMutsVec;
 
 
 void MutUtil::dumpAllMuts(){
@@ -54,6 +55,7 @@ void MutUtil::getAllMutations(const string &path){
 			AllMutsMap[m->func] = new vector<Mutation*>();
 		}
 		AllMutsMap[m->func]->push_back(m);
+		AllMutsVec.push_back(m);
 	}
 	fin.close();
 	allMutsGeted = true;
@@ -107,7 +109,13 @@ Mutation *MutUtil::getMutation(string line, int id){
 		STDMut *std = new STDMut();
 		int type;
 		ss>>type;
+		int retval;
 		std->func_ty = type;
+		if (ss.peek() == ':') {
+			ss >> colon;
+			ss >> retval;
+			std->retval = retval;
+		}
 		m = dyn_cast<Mutation>(std);
 	}else if(mtype == "LVR"){
 		LVRMut *lvr = new LVRMut();
@@ -127,6 +135,7 @@ Mutation *MutUtil::getMutation(string line, int id){
 		ss>>oi;
 		ss>>colon;
 		ss>>ut;
+		uoi->oper_index = oi;
 		uoi->ury_tp = ut;
 		m = dyn_cast<Mutation>(uoi);
 	}else if (mtype == "ROV"){

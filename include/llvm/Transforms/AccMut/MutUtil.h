@@ -39,6 +39,7 @@ using namespace llvm;
 class MutUtil{
 public:
 	static map<string, vector<Mutation*>* > AllMutsMap;
+	static vector<Mutation*> AllMutsVec;
 	static void getAllMutations(const string &path);
 	static void dumpAllMuts();
 	static BasicBlock::iterator getLocation(Function &F, int instrumented_insts, int index);
