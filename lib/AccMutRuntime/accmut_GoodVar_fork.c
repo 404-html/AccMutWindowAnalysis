@@ -23,10 +23,26 @@ extern int pnum;
 #define PAGESIZE (4096)
 #define __real_fprintf fprintf
 
+extern char *OUTPUT_FILE;
+
 int32_t goodvar_fork(int mutID)
 {
 #if 1
-    fprintf(stderr, "#\n");
+
+    if (OUTPUT_FILE == NULL) {
+        ERRMSG("OUTPUT_FILE not init");
+        exit(ENV_ERR);
+    }
+    FILE *fptr = fopen(OUTPUT_FILE, "a");
+    if (fptr == NULL) {
+        ERRMSG(OUTPUT_FILE);
+        ERRMSG("OUTPUT_FILE open error");
+        exit(ENV_ERR);
+    }
+    //fprintf(stderr, "#\n");
+    fprintf(fptr, "#\n");
+    fclose(fptr);
+
 #endif
 
     pid_t pid = fork();

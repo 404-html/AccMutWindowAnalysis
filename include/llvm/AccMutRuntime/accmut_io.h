@@ -35,6 +35,8 @@ char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp);
 
 int __accmut__getc(ACCMUT_FILE *fp);
 
+int __accmut__fgetc(ACCMUT_FILE *fp);
+
 size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp);
 
 int __accmut__ungetc(int c, ACCMUT_FILE *fp);
@@ -55,5 +57,9 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...);
 int __accmut__printf(const char *format, ...);
 
 size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE *fp);
+
+void __accmut__perror(const char *s);
+
+int __accmut__fflush(ACCMUT_FILE *stream);
 
 #endif

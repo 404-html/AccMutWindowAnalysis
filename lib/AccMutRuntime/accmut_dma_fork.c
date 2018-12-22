@@ -247,6 +247,7 @@ void __accmut__filter__mutants(int from, int to, int classid) {
 }
 
 int pnum = 1;
+char *OUTPUT_FILE = NULL;
 long __accmut__fork__eqclass(int from, int to) {
 
     if(eq_num == 1) {
@@ -263,7 +264,19 @@ long __accmut__fork__eqclass(int from, int to) {
          int pid = 0;
 
     #if 1
-         fprintf(stderr, "#\n");
+         if (OUTPUT_FILE == NULL) {
+             ERRMSG("OUTPUT_FILE not init");
+             exit(ENV_ERR);
+         }
+         FILE *fptr = fopen(OUTPUT_FILE, "a");
+         if (fptr == NULL) {
+             ERRMSG(OUTPUT_FILE);
+             ERRMSG("OUTPUT_FILE open error");
+             exit(ENV_ERR);
+         }
+         //fprintf(stderr, "#\n");
+         fprintf(fptr, "#\n");
+         fclose(fptr);
     #endif
 
          pid = fork();

@@ -281,6 +281,10 @@ int __accmut__getc(ACCMUT_FILE *fp){
     return  *((unsigned char *) fp->read_cur++);
 }
 
+int __accmut__fgetc(ACCMUT_FILE *fp) {
+    return __accmut__getc(fp);
+}
+
 size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
     ssize_t bytes_requested = size * count;
     if (bytes_requested == 0)
@@ -934,6 +938,7 @@ size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE 
 
 /*********************** BUF UTILS ****************************************/
 
+
 /*
 void __accmut__filedump(ACCMUT_FILE *fp);
 void __accmut__oracledump();
@@ -955,7 +960,6 @@ void __accmut__exit_check_output(){
     // 	__accmut__oracledump();
     // }
 }
-
 void __accmut__oracal_bufinit(){
     char path[120];
     sprintf(path, "%st%d", ORACLEDIR, TEST_ID);
@@ -983,9 +987,9 @@ void __accmut__oracal_bufinit(){
     // if(atexit(__accmut__exit_time) != 0){
     // 	fprintf(stderr, "__accmut__exit_time REGSITER ERROR\n");
     // }
-}
+}*/
 
-*/
+
 void __accmut__setout(int id){
     char path[120];
     strcpy(path, getenv("HOME"));
@@ -1034,6 +1038,13 @@ void __accmut__filedump(ACCMUT_FILE *fp){
 
     fprintf(stderr, "\n**** END **** TID:%d  MID:%d  FD:%d ***************\n\n", \
 		TEST_ID, MUTATION_ID, fp->fd);
+}*/
+
+void __accmut__perror(const char *s){
+    __accmut__fprintf(accmut_stderr, "%s\n", s);
 }
 
-*/
+int __accmut__fflush(ACCMUT_FILE *stream){
+    //all in memory, do not need flush
+    return 0;
+}
