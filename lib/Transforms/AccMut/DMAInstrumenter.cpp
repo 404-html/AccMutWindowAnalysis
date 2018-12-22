@@ -15,6 +15,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include<fstream>
@@ -464,6 +465,9 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
 		// TODO: test
 		params.push_back(c_t_a_i);
 		params.push_back(ge);
+	} else if (Argument *argu = dyn_cast<Argument>(&*OI)) {
+		params.push_back(c_t_a_i);
+		params.push_back(argu);
 	}
 	// TODO:: for Global Pointer ?!
 	else{
@@ -669,10 +673,14 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					// TODO: test
 					ge->removeFromParent();
 					label_if_then->getInstList().push_back(ge);
-				}else{
+                }else if (Operator *op = dyn_cast<Operator>(&*OI)) {
+                    ERRMSG("Operator");
+                    exit(0);
+                } else {
 					// TODO:: check
 					// TODO:: instrumented_insts !!!
 					Instruction *coversion = dyn_cast<Instruction>(&*OI);
+                    // coversion->dump();
 					if(isHandledCoveInst(coversion)){
 						Instruction* op_of_cov = dyn_cast<Instruction>(coversion->getOperand(0));
 						if(dyn_cast<LoadInst>(&*op_of_cov) || dyn_cast<AllocaInst>(&*op_of_cov)){

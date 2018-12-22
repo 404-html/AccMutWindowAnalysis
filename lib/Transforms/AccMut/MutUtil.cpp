@@ -44,7 +44,9 @@ void MutUtil::getAllMutations(const string &path){
 
 	if(!fin.is_open()){
 		errs()<<"FILE ERROR : mutations.txt @ "<<path<<"\n";
-		exit(-1);
+        allMutsGeted = true;
+        return;
+		// exit(-1);
 	}
 
 	int id = 1;

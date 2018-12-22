@@ -42,6 +42,9 @@ public:
 private:
 
     Module *TheModule;
+    bool firstTime = true;
+    GlobalVariable *rmigv;
+    StructType *regmutinfo;
 
     bool runOnFunction(Function &F);
 

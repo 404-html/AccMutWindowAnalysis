@@ -21,6 +21,125 @@ bool WAInstrumenter::runOnModule(Module &M)
     TheModule = &M;
 
     MutUtil::getAllMutations(TheModule->getName());
+
+    vector<Mutation*> &AllMutsVec = MutUtil::AllMutsVec;
+
+    if (AllMutsVec.size() == 0)
+        return false;
+
+	if (firstTime) {
+		StructType *t = TheModule->getTypeByName("struct.Mutation");
+		if (t == nullptr) {
+		    t = StructType::create(
+		            TheModule->getContext(),
+		            {IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 32),
+                     IntegerType::get(TheModule->getContext(), 64),
+                     IntegerType::get(TheModule->getContext(), 64)},
+                     "struct.Mutation");
+		}
+		std::vector<Constant *> vec;
+		vec.reserve(AllMutsVec.size());
+		for (uint64_t i = 0; i < AllMutsVec.size(); ++i) {
+			Mutation *mut = AllMutsVec[i];
+			int type = mut->getKind();
+			int sop = mut->src_op;
+			int op_0 = 0;
+			long op_1 = 0;
+			long op_2 = 0;
+			switch (type) {
+				case Mutation::MK_AOR:
+					op_0 = dyn_cast<AORMut>(mut)->tar_op;
+					break;
+				case Mutation::MK_LOR:
+					op_0 = dyn_cast<LORMut>(mut)->tar_op;
+					break;
+				case Mutation::MK_ROR:
+					op_1 = dyn_cast<RORMut>(mut)->src_pre;
+					op_2 = dyn_cast<RORMut>(mut)->tar_pre;
+					break;
+				case Mutation::MK_STD:
+					op_1 = dyn_cast<STDMut>(mut)->func_ty;
+					op_2 = dyn_cast<STDMut>(mut)->retval;
+					break;
+				case Mutation::MK_LVR:
+					op_0 = dyn_cast<LVRMut>(mut)->oper_index;
+					op_1 = dyn_cast<LVRMut>(mut)->src_const;
+					op_2 = dyn_cast<LVRMut>(mut)->tar_const;
+					break;
+				case Mutation::MK_UOI:
+					op_1 = dyn_cast<UOIMut>(mut)->oper_index;
+					op_2 = dyn_cast<UOIMut>(mut)->ury_tp;
+					break;
+				case Mutation::MK_ROV:
+					op_1 = dyn_cast<ROVMut>(mut)->op1;
+					op_2 = dyn_cast<ROVMut>(mut)->op2;
+					break;
+				case Mutation::MK_ABV:
+					op_0 = dyn_cast<ABVMut>(mut)->oper_index;
+					break;
+				default:
+					break;
+			}
+			vec.push_back((ConstantStruct::get(t, {
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), type, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), sop, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), op_0, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 64), op_1, true),
+					ConstantInt::get(IntegerType::get(TheModule->getContext(), 64), op_2, true)
+			})));
+		}
+		ConstantArray *a = dyn_cast<ConstantArray>(ConstantArray::get(ArrayType::get(t, vec.size()),
+																	  ArrayRef<Constant *>(vec)));
+		GlobalVariable *gv1 = new GlobalVariable(
+				*TheModule,
+				ArrayType::get(t, vec.size()),
+				false, llvm::GlobalValue::LinkageTypes::InternalLinkage,
+				a,
+				"mutarray",
+				nullptr,
+				llvm::GlobalValue::ThreadLocalMode::NotThreadLocal,
+				0
+		);
+
+		regmutinfo = TheModule->getTypeByName("struct.RegMutInfo");
+		if (regmutinfo == nullptr) {
+		    regmutinfo = StructType::create(
+		            TheModule->getContext(),
+                    {PointerType::get(t, 0),
+					 IntegerType::get(TheModule->getContext(), 32),
+					 IntegerType::get(TheModule->getContext(), 32),
+					 IntegerType::get(TheModule->getContext(), 32)},
+					 "struct.RegMutInfo"
+		            );
+		}
+
+		Constant *gep = ConstantExpr::getInBoundsGetElementPtr(nullptr, gv1, ArrayRef<Constant *>({
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+		}));
+		ConstantStruct *rmi = dyn_cast<ConstantStruct>(ConstantStruct::get(regmutinfo, {
+			gep,
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), vec.size(), false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false),
+			ConstantInt::get(IntegerType::get(TheModule->getContext(), 32), 0, false)
+		}));
+		rmigv = new GlobalVariable(
+				*TheModule,
+				regmutinfo,
+				false, llvm::GlobalValue::LinkageTypes::InternalLinkage,
+				rmi,
+				"mutrmi",
+				nullptr,
+				llvm::GlobalValue::ThreadLocalMode::NotThreadLocal,
+				0
+				);
+		firstTime = false;
+	}
+
+
+
     setGoodVarFunc();
 
     bool changed = false;
@@ -144,7 +263,8 @@ void WAInstrumenter::setGoodVarBinaryFunc(Function *&F, string name, Type *retTy
         Type *i32 = Type::getInt32Ty(TheModule->getContext());
 
         // mut_from mut_to operand1 operand2 goodVarIdRet goodVarIdOp1 goodVarOp2 originalOp
-        vector<Type*> paramTypes{i32, i32, paramType, paramType, i32, i32, i32, i32};
+        vector<Type*> paramTypes{PointerType::get(regmutinfo, 0),
+                                 i32, i32, paramType, paramType, i32, i32, i32, i32};
 
         F = Function::Create(
                 /*Type=*/ FunctionType::get(retType, paramTypes, false),
@@ -374,6 +494,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
 
         if (!precallfunc) {
             std::vector<Type*>FuncTy_3_args;
+            FuncTy_3_args.push_back(PointerType::get(regmutinfo, 0));
             FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
             FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
             FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
@@ -404,6 +525,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
 
 
         std::vector<Value*> params;
+        params.push_back(rmigv);
         std::stringstream ss;
         ss<<mut_from;
         ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
@@ -455,7 +577,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
         ss<<record_num;
         ConstantInt* rcd = ConstantInt::get(TheModule->getContext(),
                                             APInt(32, StringRef(ss.str()), 10));
-        params.insert( params.begin()+2 , rcd);
+        params.insert( params.begin()+3 , rcd);
 
         CallInst *pre = CallInst::Create(precallfunc, params, "", &*cur_it);
         pre->setCallingConv(CallingConv::C);
@@ -680,6 +802,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
             if(!prestfunc){
                 PointerType* PointerTy_1 = PointerType::get(IntegerType::get(TheModule->getContext(), 32), 0);
                 std::vector<Type*> FuncTy_4_args;
+                FuncTy_4_args.push_back(PointerType::get(regmutinfo, 0));
                 FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                 FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                 FuncTy_4_args.push_back(IntegerType::get(TheModule->getContext(), 32));
@@ -714,6 +837,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                 PointerType* PointerTy_2 = PointerType::get(IntegerType::get(TheModule->getContext(), 64), 0);
 
                 std::vector<Type*>FuncTy_6_args;
+                FuncTy_6_args.push_back(PointerType::get(regmutinfo, 0));
                 FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                 FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                 FuncTy_6_args.push_back(IntegerType::get(TheModule->getContext(), 64));
@@ -752,6 +876,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
 
 
         std::vector<Value*> params;
+        params.push_back(rmigv);
         std::stringstream ss;
         ss<<mut_from;
         ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
@@ -860,6 +985,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                     if (!f_process)
                     {
                         std::vector<Type *> ftp_args;
+                        ftp_args.push_back(PointerType::get(regmutinfo, 0));
                         ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
@@ -895,6 +1021,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                     f_process = TheModule->getFunction("__accmut__process_i64_arith");
 
                     std::vector<Type *> ftp_args;
+                    ftp_args.push_back(PointerType::get(regmutinfo, 0));
                     ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                     ftp_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                     ftp_args.push_back(IntegerType::get(TheModule->getContext(), 64));
@@ -931,6 +1058,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
             }
 
             std::vector<Value*> int_call_params;
+            int_call_params.push_back(rmigv);
             std::stringstream ss;
             ss<<mut_from;
             ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(), APInt(32, StringRef(ss.str()), 10));
@@ -970,6 +1098,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                     {
 
                         std::vector<Type *> FuncTy_3_args;
+                        FuncTy_3_args.push_back(PointerType::get(regmutinfo, 0));
                         FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         FuncTy_3_args.push_back(IntegerType::get(TheModule->getContext(), 32));
@@ -1013,6 +1142,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
                     {
 
                         std::vector<Type *> FuncTy_5_args;
+                        FuncTy_5_args.push_back(PointerType::get(regmutinfo, 0));
                         FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 32));
                         FuncTy_5_args.push_back(IntegerType::get(TheModule->getContext(), 64));
@@ -1050,6 +1180,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable)
             }
 
             std::vector<Value*> int_call_params;
+            int_call_params.push_back(rmigv);
             std::stringstream ss;
             ss<<mut_from;
             ConstantInt* from_i32= ConstantInt::get(TheModule->getContext(),
