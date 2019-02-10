@@ -369,8 +369,6 @@ long __accmut__fork__eqclass(int from, int to) {
 /** End Added **/
 
 
-extern int MUT_NUM;
-
 void __accmut__init(){
 
     gettimeofday(&tv_begin, NULL);
@@ -399,6 +397,10 @@ void __accmut__init(){
         default_active_set[i] = 1;
     }*/
     default_active_set[0] = 1;
+
+    accmut_stdin->orifile = stdin;
+    accmut_stdout->orifile = stdout;
+    accmut_stderr->orifile = stderr;
 }
 
 void __accmut__register(RegMutInfo *rmi) {

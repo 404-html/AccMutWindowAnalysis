@@ -12,6 +12,9 @@ typedef struct _ACCMUT_FILE
 	char *read_cur;
 	char *write_cur;
 	int fsize;	//only for input file
+	FILE *orifile;
+	int usetmp;
+	char *filename;
 }ACCMUT_FILE;
 
 extern ACCMUT_FILE* accmut_stdin;

@@ -34,16 +34,45 @@ size_t CUR_STDERR = 0;
 
 /***********************************************************/
 
-#define DEF_STDFILE(NAME, FD, BUF, MAXSIZE, FLAGS) \
-	ACCMUT_FILE NAME = {FLAGS, FD, BUF, (BUF + MAXSIZE), BUF, BUF, 0}
+#define DEF_STDFILE(NAME, FD, BUF, MAXSIZE, FLAGS, ORINAME) \
+	ACCMUT_FILE NAME = {FLAGS, FD, BUF, (BUF + MAXSIZE), BUF, BUF, 0, NULL, 0, ORINAME}
 
-DEF_STDFILE(stdfile_0, 0, (char*)NULL, 0, 0);	//unimplemented stdin
-DEF_STDFILE(stdfile_1, 1, STDOUT_BUFF, MAX_STDOUT_BUF_SIZE, O_WRONLY);
-DEF_STDFILE(stdfile_2, 2, STDERR_BUFF, MAX_STDERR_BUF_SIZE, O_WRONLY);
+DEF_STDFILE(stdfile_0, 0, (char*)NULL, 0, 0, "stdin");	//unimplemented stdin
+DEF_STDFILE(stdfile_1, 1, STDOUT_BUFF, MAX_STDOUT_BUF_SIZE, O_WRONLY, "stdout");
+DEF_STDFILE(stdfile_2, 2, STDERR_BUFF, MAX_STDERR_BUF_SIZE, O_WRONLY, "stderr");
 
 ACCMUT_FILE* accmut_stdin = &stdfile_0;
 ACCMUT_FILE* accmut_stdout = &stdfile_1;
 ACCMUT_FILE* accmut_stderr = &stdfile_2;
+
+int __real_fprintf(FILE *fp, const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    return vfprintf(fp, format, ap);
+    va_end(ap);
+}
+
+#define NOCALLLOG
+
+#ifndef NOCALLLOG
+
+#define _CALLLOG(dummy, fp, ...) \
+    if (MUTATION_ID == 0) {\
+        __real_fprintf(stderr, "pid: %d\n", getpid());\
+        if ((fp) != NULL) {\
+            __real_fprintf(stderr, "\033[32mCalling %s on %s\n\033[0m", __FUNCTION__, (fp)->filename);\
+        } else {\
+            __real_fprintf(stderr, "\033[32mCalling %s\n\033[0m", __FUNCTION__);\
+        }\
+    }
+
+#define CALLLOG(...) _CALLLOG(0, ##__VA_ARGS__, (ACCMUT_FILE*)(NULL))
+
+#else
+
+#define CALLLOG(...)
+
+#endif
 
 
 /*********************** FILE OPTIONS ****************************************/
@@ -54,6 +83,8 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
     int omode;
     int oflags = 0;
     int oprot = 0666;
+    const char *orimode = mode;
+    int needTrunc = 0;
 
     switch(*mode++)
     {
@@ -63,6 +94,7 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
         case 'w':
             omode = O_WRONLY;
             oflags = O_CREAT|O_TRUNC;
+            needTrunc = 1;
             break;
             // case 'a':
             // 	0flags = O_WRONLY | O_APPEND;
@@ -76,7 +108,38 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
     // 	omode = O_RDONLY | O_WRONLY;
     // }
 
+    /** new **/
+    ACCMUT_FILE *fp = (ACCMUT_FILE *)malloc(sizeof(ACCMUT_FILE));
+    if(fp == NULL)
+        return NULL;
 
+    fp->filename = (char *)malloc(strlen(path) + 10);
+    strcpy(fp->filename, path);
+    CALLLOG(fp);
+
+    fp->orifile = NULL;
+
+    int _fd;
+    if (MUTATION_ID != 0 && needTrunc) {
+        fp->usetmp = 1;
+        fp->orifile = tmpfile();
+        _fd = fileno(fp->orifile);
+    } else {
+        // can truncate
+        _fd = open(path, omode | oflags, oprot);
+        fp->usetmp = 0;
+    }
+
+    if(_fd < 0){
+#if ACCMUT_IO_DEBUG
+        fprintf(stdout, "OPEN ERROR, PATH: \"%s\", MODE: %d  @__accmut__fopen. TID: %d , MUT: %d\n", path, omode, TEST_ID, MUTATION_ID);
+#endif
+        free(fp->filename);
+        free(fp);
+        return NULL;
+    }
+    /** new **/
+    /** original
     int _fd = open(path, omode | oflags, oprot);
 
     if(_fd < 0){
@@ -90,6 +153,11 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
 
     if(fp == NULL)
         return NULL;
+    fp->orifile = NULL;
+    fp->usetmp = 0;
+
+    /** end original **/
+
 
     if(omode == O_RDONLY){
 
@@ -109,6 +177,16 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
         fp->write_cur = NULL;
         fp->fsize = sb.st_size;
         fp->bufend = fp->bufbase + fp->fsize;
+        if (MUTATION_ID == 0) {
+            fp->orifile = fopen(path, orimode);
+            if (fp->orifile == NULL) {
+                if (fp->read_cur) {
+                    munmap(fp->read_cur, sb.st_size);
+                }
+                free(fp);
+                return NULL;
+            }
+        }
 
     }else if(omode == O_WRONLY){
 
@@ -118,6 +196,18 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
         fp->read_cur = NULL;
         fp->fsize = 0;
         fp->bufend = fp->bufbase + MAX_FILE_BUF_SIZE*(sizeof(char));
+        if (MUTATION_ID == 0) {
+            fp->orifile = fopen(path, orimode);
+            if (fp->orifile == NULL) {
+                ERRMSG("ok?");
+                if (fp->write_cur) {
+                    free(fp->write_cur);
+                }
+                free(fp);
+                return NULL;
+            }
+            ERRMSG("ok");
+        }
     }
 
     return fp;
@@ -125,9 +215,18 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
 
 
 int __accmut__fclose(ACCMUT_FILE *fp){
+    CALLLOG(fp);
+    //if (fp->filename)
+    //    free(fp->filename);
     int status = 0;
+    if (fp->usetmp) {
+        return fclose(fp->orifile);
+    }
+    if (fp->orifile) {
+        status = fclose(fp->orifile);
+    }
     if(fp->flags == O_RDONLY){
-        status = munmap(fp->bufbase, fp->fsize);
+        status = status & munmap(fp->bufbase, fp->fsize);
         status = status & close(fp->fd);
         free(fp);
     }else if(fp->flags == O_WRONLY){
@@ -138,7 +237,7 @@ int __accmut__fclose(ACCMUT_FILE *fp){
         // 	return status;
         // }
 
-        status = close(fp->fd);
+        status = status & close(fp->fd);
 
         //fprintf(stderr, "  Close : %d  %d  %d\n", fp->fd, status, MUTATION_ID);
         // TODO: save results
@@ -152,6 +251,7 @@ int __accmut__fclose(ACCMUT_FILE *fp){
 
 
 int __accmut__feof(ACCMUT_FILE *fp){
+    CALLLOG(fp);
 
     if(fp == NULL){
         return EOF;
@@ -168,20 +268,24 @@ int __accmut__feof(ACCMUT_FILE *fp){
 }
 
 int __accmut__fseek(ACCMUT_FILE *fp, size_t offset, int loc){
+    CALLLOG(fp);
     //TODO
     return 0;
 }
 
 int __accmut__ferror(ACCMUT_FILE *fp){
+    CALLLOG(fp);
     //TODO:
     return 0;
 }
 
 int __accmut__fileno(ACCMUT_FILE *fp){
+    CALLLOG(fp);
     return fp->fd;
 }
 
 ACCMUT_FILE * __accmut__freopen(const char *path, const char *mode, ACCMUT_FILE *fp){
+    CALLLOG(fp);
     ACCMUT_FILE * newfp = __accmut__fopen(path, mode);
     if(newfp == NULL){
         return NULL;
@@ -224,6 +328,7 @@ ACCMUT_FILE * __accmut__freopen(const char *path, const char *mode, ACCMUT_FILE 
 
 /*********************** POSIX FILE ****************************************/
 int __accmut__unlink(const char *pathname){
+    CALLLOG();
 
     if(MUTATION_ID == 0){// only main process can unlink the tmp file
         return unlink(pathname);
@@ -235,6 +340,7 @@ int __accmut__unlink(const char *pathname){
 /*********************** INPUT ****************************************/
 
 char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp){
+    CALLLOG(fp);
     if(size <= 0)
         return NULL;
 
@@ -266,10 +372,48 @@ char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp){
 
     *(buf + len) = '\0';
 
+    if (MUTATION_ID == 0) {
+        char intenalbuf[size + 1];
+        //ERRMSG(fp->orifile->_IO_read_ptr);
+        int before = 0, after = 0;
+        // ERRMSG("\033[33mBegin dump content\n\033[0m");
+
+        // ERRMSG2("base", (int)(fp->orifile->_IO_read_base));
+        // ERRMSG2("ptr", (int)(fp->orifile->_IO_read_ptr));
+        // ERRMSG("\033[32mBegin dump\n\033[0m");
+        /* if (fp->orifile->_IO_read_base)
+            ERRMSG2("len of base before", (int)strlen(fp->orifile->_IO_read_base));
+        if (fp->orifile->_IO_read_ptr)
+            ERRMSG2("len of cur before", (before = (int)strlen(fp->orifile->_IO_read_ptr)));
+        */
+        fgets(intenalbuf, size, fp->orifile);
+        /*
+        if (fp->orifile->_IO_read_base)
+            ERRMSG2("len of base after", (int)strlen(fp->orifile->_IO_read_base));
+        if (fp->orifile->_IO_read_ptr)
+            ERRMSG2("len of cur after", (after = (int)strlen(fp->orifile->_IO_read_ptr)));
+        ERRMSG("\033[33mBegin dump content\n\033[0m");
+
+        ERRMSG2("base", (int)(fp->orifile->_IO_read_base));
+        ERRMSG2("ptr", (int)(fp->orifile->_IO_read_ptr));
+        //ERRMSG("\033[32m");
+        //ERRMSG("\033[0m");
+        ERRMSG(buf);
+        ERRMSG(intenalbuf);
+        */
+        if (strcmp(buf, intenalbuf) != 0) {
+            // panic
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+
     return buf;
 }
 
 int __accmut__getc(ACCMUT_FILE *fp){
+    CALLLOG(fp);
     if(fp->read_cur - fp->bufbase >= fp->fsize){
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "READ OVERFLOW @ __accmut__getc, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
@@ -278,14 +422,25 @@ int __accmut__getc(ACCMUT_FILE *fp){
         return EOF;
     }
 
-    return  *((unsigned char *) fp->read_cur++);
+    int ret = *((unsigned char *) fp->read_cur++);
+
+    if (MUTATION_ID == 0) {
+        if (getc(fp->orifile) != ret) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return ret;
 }
 
 int __accmut__fgetc(ACCMUT_FILE *fp) {
+    CALLLOG(fp);
     return __accmut__getc(fp);
 }
 
 size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
+    CALLLOG(fp);
     ssize_t bytes_requested = size * count;
     if (bytes_requested == 0)
         return 0;
@@ -301,18 +456,49 @@ size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
 #endif
 
         memcpy(s, fp->read_cur, fp->bufend - fp->read_cur);
-        int res = (fp->bufend - fp->read_cur)/size;
+        size_t res = (fp->bufend - fp->read_cur)/size;
         fp->read_cur = fp->bufend;
         //fprintf(stderr, "%s\n", s);
         fp->flags |= _IO_EOF_SEEN;
+
+        if (MUTATION_ID == 0) {
+            char internalbuf[size * count];
+            size_t internalres = fread(internalbuf, size, count, fp->orifile);
+            if (res != internalres ||
+                memcmp(buf, internalbuf, size * res) != 0) {
+                ERRMSG("\033[31mNo sync with stdio\033[0m");
+                ERRMSG("\033[33m");
+                ERRMSG2("requested", count);
+                ERRMSG2("real", res);
+                ERRMSG2("internal", internalres);
+                ERRMSG("\033[0m");
+                exit(EXIT_FAILURE);
+            }
+        }
         return res;
     }
     memcpy(s, fp->read_cur, bytes_requested);
     fp->read_cur += bytes_requested;
+    if (MUTATION_ID == 0) {
+        char internalbuf[size * count];
+        size_t internalres = fread(internalbuf, size, count, fp->orifile);
+
+        if (count != internalres ||
+            memcmp(buf, internalbuf, size * count) != 0) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            ERRMSG("\033[33m");
+            ERRMSG2("requested", count);
+            ERRMSG2("real", count);
+            ERRMSG2("internal", internalres);
+            ERRMSG("\033[0m");
+            exit(EXIT_FAILURE);
+        }
+    }
     return count;
 }
 
 int __accmut__ungetc(int c, ACCMUT_FILE *fp){
+    CALLLOG(fp);
 
     if(c == EOF)
         return EOF;
@@ -332,10 +518,18 @@ int __accmut__ungetc(int c, ACCMUT_FILE *fp){
         res = (unsigned char) c;
     }
     else
-        res = NULL;
+        res = EOF;
 
     if (res != EOF)
         fp->flags &= ~_IO_EOF_SEEN;
+
+    if (MUTATION_ID == 0) {
+        int r = ungetc(c, fp->orifile);
+        if (r != res) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     return res;
 }
@@ -774,6 +968,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
 
 
 int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...){
+    CALLLOG(fp);
     if(fp->flags & _IO_EOF_SEEN != 0){
         return  EOF;
     }
@@ -795,12 +990,23 @@ int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...){
 
     va_end(ap);
 
+    if (MUTATION_ID == 0) {
+        va_start(ap, format);
+        int r = vfscanf(fp->orifile, format, ap);
+        va_end(ap);
+        if (r != retval) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     return retval;
 }
 
 /*********************** OUTPUT ****************************************/
 
 int __accmut__fputc(int c, ACCMUT_FILE *fp){
+    CALLLOG(fp);
 
     if(fp->write_cur >= fp->bufend){
 #if ACCMUT_IO_DEBUG
@@ -812,11 +1018,19 @@ int __accmut__fputc(int c, ACCMUT_FILE *fp){
     // fp->fsize++;
     *(fp->write_cur) = c;
     (fp->write_cur)++;
+    if (MUTATION_ID == 0) {
+        if (fputc(c, fp->orifile) != c) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+        fflush(fp->orifile);
+    }
     return (unsigned char) c;
 }
 
 
 int __accmut__fputs(const char* s, ACCMUT_FILE *fp){
+    CALLLOG(fp);
     int result = EOF;
     size_t len = strlen(s);
     if(fp->write_cur + len >= fp->bufend){
@@ -828,11 +1042,19 @@ int __accmut__fputs(const char* s, ACCMUT_FILE *fp){
         fp->write_cur += len;
         // fp->fsize += len;
         result = 1;
+        if (MUTATION_ID == 0) {
+            if (fputs(s, fp->orifile) == EOF) {
+                ERRMSG("\033[31mNo sync with stdio\033[0m");
+                exit(EXIT_FAILURE);
+            }
+            fflush(fp->orifile);
+        }
     }
     return result;
 }
 
 int __accmut__puts(const char* s){
+    CALLLOG(accmut_stdout);
     int result = EOF;
     size_t len = strlen(s);
     if( (accmut_stdout->write_cur + len + 1) >= accmut_stdout->bufend){
@@ -848,6 +1070,13 @@ int __accmut__puts(const char* s){
         //accmut_stdout->write_cur++;
         // accmut_stdout->fsize += len + 1;
         result = 1;
+        if (MUTATION_ID == 0) {
+            if (puts(s) == EOF) {
+                ERRMSG("\033[31mNo sync with stdio\033[0m");
+                exit(EXIT_FAILURE);
+            }
+            fflush(stdout);
+        }
     }
     return result;
 }
@@ -864,6 +1093,7 @@ int __accmut__puts(const char* s){
 // }
 
 int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
+    CALLLOG(fp);
 
     if(fp == NULL){
 #if ACCMUT_IO_DEBUG
@@ -900,12 +1130,25 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
 #endif
         return 0;
     }
+    // ERRMSG("???");
+    if (MUTATION_ID == 0) {
+    // ERRMSG("???1");
+        va_start(ap, format);
+        if (ret != vfprintf(fp->orifile, format, ap)) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+        fflush(fp->orifile);
+        va_end(ap);
+    }
+    // ERRMSG("???");
 
     fp->write_cur += ret;
     return ret;
 }
 
 int __accmut__printf(const char *format, ...){
+    CALLLOG(accmut_stdout);
     int ret;
     va_list ap;
     va_start(ap, format);
@@ -919,12 +1162,23 @@ int __accmut__printf(const char *format, ...){
         return 0;
     }
 
+    if (MUTATION_ID == 0) {
+        va_start(ap, format);
+        if (ret != vprintf(format, ap)) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+        va_end(ap);
+        fflush(stdout);
+    }
+
     accmut_stdout->write_cur += ret;
     return ret;
 }
 
 size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
-    int request = size*count;
+    CALLLOG(fp);
+    size_t request = size*count;
     if(fp->write_cur + request > fp->bufend){
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "ACCMUT WRITE OVERFLOW !  @__accmut__fwrite, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
@@ -933,6 +1187,13 @@ size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE 
     }
     memcpy(fp->write_cur, buf, request);
     fp->write_cur += request;
+    if (MUTATION_ID == 0) {
+        if (request != fwrite(buf, size, count, fp->orifile)) {
+            ERRMSG("\033[31mNo sync with stdio\033[0m");
+            exit(EXIT_FAILURE);
+        }
+        fflush(fp->orifile);
+    }
     return count;
 }
 
@@ -1041,10 +1302,12 @@ void __accmut__filedump(ACCMUT_FILE *fp){
 }*/
 
 void __accmut__perror(const char *s){
+    CALLLOG();
     __accmut__fprintf(accmut_stderr, "%s\n", s);
 }
 
 int __accmut__fflush(ACCMUT_FILE *stream){
+    CALLLOG(stream);
     //all in memory, do not need flush
     return 0;
 }
