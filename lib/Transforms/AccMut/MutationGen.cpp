@@ -54,7 +54,7 @@ string MutationGen::getMutationFilePath() {
     return home + "/tmp/accmut/mutations.txt";
 }
 
-MutationGen::MutationGen(/*Module *M*/) : FunctionPass(ID) {
+MutationGen::MutationGen(/*Module *M*/) : ModulePass(ID) {
 	//this->TheModule = M;
 	sys::fs::remove(MutationGen::getMutationFilePath());
 }
@@ -64,6 +64,14 @@ static int muts_num = 0;
 #if NEED_LOOP_INFO
 static LoopInfo *LI;
 #endif
+
+bool MutationGen::runOnModule(Module &M) {
+  bool changed = false;
+  for (Function &F : M)
+    if (!F.isDeclaration())
+      changed |= runOnFunction(F);
+  return changed;
+}
 
 bool MutationGen::runOnFunction(Function &F) {
 

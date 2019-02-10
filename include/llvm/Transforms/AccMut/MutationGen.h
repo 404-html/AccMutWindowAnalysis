@@ -16,7 +16,7 @@
 
 using namespace llvm;
 
-class MutationGen: public FunctionPass{
+class MutationGen: public ModulePass{
 public:
 	static char ID;// Pass identification, replacement for typeid
 	virtual void getAnalysisUsage(AnalysisUsage &AU) const;
@@ -24,11 +24,12 @@ public:
 	Module *TheModule;
 	static std::ofstream  ofresult; 
 	MutationGen(/*Module *M*/);
-	virtual bool runOnFunction(Function &F);
-	static void genMutationFile(Function & F);
+	virtual bool runOnModule(Module &M);
+	static void genMutationFile(Function &F);
 	static std::string getMutationFilePath();
 	static bool firstFunctionSeen;
 private:
+	bool runOnFunction(Function &F);
 	static void genAOR(Instruction *inst,StringRef fname, int index);
 	static void genLOR(Instruction *inst, StringRef fname, int index);
 	static void genCOR();
