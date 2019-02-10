@@ -250,11 +250,12 @@ int pnum = 1;
 char *OUTPUT_FILE = NULL;
 long __accmut__fork__eqclass(int from, int to) {
 
+
     if(eq_num == 1) {
         return eqclass[0].value;
     }
 
-    int result = eqclass[0].value;
+    long result = eqclass[0].value; //....
     int id = eqclass[0].mut_id[0];
     int i;
 
