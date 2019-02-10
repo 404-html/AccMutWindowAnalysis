@@ -18,10 +18,15 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
+
 #include<fstream>
 #include<sstream>
 #include<string>
 #include<cstdlib>
+#include<map>
+#include<set>
 
 
 
@@ -32,7 +37,7 @@ using namespace std;
 
 #define VALERRMSG(it,msg,cp) llvm::errs()<<"\tCUR_IT:\t"<<(*(it))<<"\n\t"<<(msg)<<":\t"<<(*(cp))<<"\n"
 
-DMAInstrumenter::DMAInstrumenter(/*Module *M*/) : FunctionPass(ID) {
+DMAInstrumenter::DMAInstrumenter(/*Module *M*/) : ModulePass(ID) {
 	//this->TheModule = M;
 	//getAllMutations();
 }
@@ -251,24 +256,14 @@ static void test(Function &F){
 }
 */
 
-bool DMAInstrumenter::runOnFunction(Function & F){
-	if(F.getName().startswith("__accmut__")){
-		return false;
-	}
-	if(F.getName().equals("main")){
-		return true;
-	}
-	TheModule = F.getParent();
+bool DMAInstrumenter::runOnModule(Module &M) {
+  TheModule = &M;
 
 	MutUtil::getAllMutations(TheModule->getName());
 
-	vector<Mutation*>* v= MutUtil::AllMutsMap[F.getName()];
-
-	if(v == NULL || v->size() == 0){
-		return false;
-	}
-
 	vector<Mutation*> &AllMutsVec = MutUtil::AllMutsVec;
+  if (AllMutsVec.size() == 0)
+    return false;
 
 	if (firstTime) {
 		StructType *t = TheModule->getTypeByName("struct.Mutation");
@@ -381,8 +376,33 @@ bool DMAInstrumenter::runOnFunction(Function & F){
 		firstTime = false;
 	}
 
+  bool changed = false;
+  for (Function &F : M)
+    if (!F.isDeclaration())
+      changed |= runOnFunction(F);
+  return changed;
+
+}
+
+bool DMAInstrumenter::runOnFunction(Function & F){
+	if(F.getName().startswith("__accmut__")){
+		return false;
+	}
+	if(F.getName().equals("main")){
+		return true;
+	}
+
+	vector<Mutation*>* v= MutUtil::AllMutsMap[F.getName()];
+
+	if(v == NULL || v->size() == 0){
+		return false;
+	}
+
 	errs()<<"\n######## DMA INSTRUMTNTING MUT  @"<<TheModule->getName()<<"->"<<F.getName()<<"()  ########\n\n";
 
+  // moveLiteralForFunc(F, v);
+
+  collectCanMove(F, v);
 	instrument(F, v);
 	//test(F);
 
@@ -463,21 +483,203 @@ static bool pushPreparecallParam(std::vector<Value*>& params, int index, Value *
 		params.push_back(alloca);
 	}else if(GetElementPtrInst *ge = dyn_cast<GetElementPtrInst>(&*OI)){
 		// TODO: test
+    // return false;
 		params.push_back(c_t_a_i);
 		params.push_back(ge);
-	} else if (Argument *argu = dyn_cast<Argument>(&*OI)) {
+	} /*else if (Argument *argu = dyn_cast<Argument>(&*OI)) {
+    // return false;
 		params.push_back(c_t_a_i);
 		params.push_back(argu);
-	}
+    }*/
 	// TODO:: for Global Pointer ?!
 	else{
 		ERRMSG("CAN NOT GET A POINTER");
 		Value *v = dyn_cast<Value>(&*OI);
 		llvm::errs()<<"\tCUR_OPREAND:\t";
+    llvm::errs() << *v << "\n";
 		// v->dump();
 		exit(0);
 	}
 	return true;
+}
+
+static StoreInst *mayAlias(AliasAnalysis *AA, LoadInst *ld, StoreInst *st) {
+  auto loc = MemoryLocation::get(ld);
+  auto info = AA->getModRefInfo(st, loc);
+  if (isNoModRef(info)) {
+    return nullptr;
+  }
+  return st;
+}
+
+static StoreInst *mayAliasBetween(AliasAnalysis *AA, LoadInst *ld, CallInst *call) {
+  assert(ld->getParent() == call->getParent());
+  auto i = ld->getNextNode();
+  llvm::errs() << "ld inst" << *ld << "\n";
+  while (i != call) {
+    if (StoreInst *st = dyn_cast<StoreInst>(i)) {
+      llvm::errs() << "store inst" << *st << "\n";
+      if (mayAlias(AA, ld, st)) {
+        llvm::errs() << "may alias" << *st << "\n";
+        return st;
+      }
+    }
+    i = i->getNextNode();
+  }
+  return nullptr;
+}
+
+void DMAInstrumenter::collectCanMove(Function &F, vector<Mutation*> *v) {
+  canMove.clear();
+  std::unordered_map<Value*, int> numDirectUse;
+  // auto &t = getAnalysis<MemoryDependenceWrapperPass>();
+  AliasAnalysis *AA = &getAnalysis<AAResultsWrapperPass>(F).getAAResults();
+  // If more users exists, don't move
+  for (auto i = F.begin(); i != F.end(); ++i) {
+    for (auto j = i->begin(); j != i->end(); ++j) {
+      for (auto x = j->op_begin(); x != j->op_end(); ++x) {
+        numDirectUse[(x->get())]++;
+      }
+    }
+  }
+  for (unsigned i = 0; i < v->size(); ++i) {
+    int cur_index = (*v)[i]->index;
+    for (unsigned j = i + 1; j < v->size(); ++j) {
+      if ((*v)[j]->index == cur_index) {
+        i = j;
+      } else {
+        break;
+      }
+    }
+    auto cur_it = getLocation(F, 0, cur_index);
+    if (CallInst *inst = dyn_cast<CallInst>(&*cur_it)) {
+      for (auto i = inst->op_begin(); i != inst->op_end(); ++i) {
+        auto j = i->get();
+        if (LoadInst *ld = dyn_cast<LoadInst>(&*j)) {
+          if (numDirectUse[&*ld] != 1) {
+            llvm::errs() << "No\t" << *ld << "\n";
+            canMove[&*ld] = false;
+            continue;
+          } else {
+            // only consider basic block local ops, perhaps all ops are basic block local since we perform no optimize
+            if (ld->getParent() != inst->getParent()) {
+              llvm::errs() << "Not BB\t" << *ld << "\n";
+              canMove[&*ld] = false;
+              continue;
+            }
+            if (StoreInst *st = mayAliasBetween(AA, ld, inst)) {
+              llvm::errs() << "May alias\t" << *ld << "\n" << "With\t" << *st << "\n";
+              canMove[&*ld] = false;
+              continue;
+            }
+            llvm::errs() << "Yes\t" << *ld << "\n";
+            canMove[&*ld] = true;
+            continue;
+          }
+        } else {
+          assert(false);
+        }
+      }
+    }
+  }
+
+  /*
+  for (auto i = F.begin(); i != F.end(); ++i) {
+    for (auto j = i->begin(); j != i->end(); ++j) {
+      if (isa<LoadInst>(&*j) ||
+          isa<Constant>(&*j) ||
+          isa<GetElementPtrInst>(*&*j)) {
+        if (numDirectUse[&*j] != 1) {
+          goto no;
+        }
+        goto yes;
+      } else if (isa<Operator>(&*j)) {
+        llvm::errs() << "operator\n";
+        goto noneed;
+      } else {
+        llvm::errs() << "instruction\n";
+        Instruction *coversion = dyn_cast<Instruction>(&*j);
+        if (isHandledCoveInst(coversion)) {
+          Instruction* op_of_cov = dyn_cast<Instruction>(coversion->getOperand(0));
+          if(isa<LoadInst>(&*op_of_cov) || isa<AllocaInst>(&*op_of_cov)){
+            if (numDirectUse[&*j] != 1 || numDirectUse[&*op_of_cov] != 1) {
+              goto no;
+            } else {
+              goto yes;
+            }
+          } else {
+            llvm::errs() << "noneed inst\n";
+            goto noneed;
+          }
+        } else {
+          goto noneed;
+        }
+      }
+
+    noneed:
+      llvm::errs() << "No need\t" << *j << "\n";
+      continue;
+    no:
+      llvm::errs() << "No\t" << *j << "\n";
+      canMove[&*j] = false;
+      continue;
+    yes:
+      llvm::errs() << "Yes\t" << *j << "\n";
+      canMove[&*j] = true;
+      continue;
+    }
+    }*/
+}
+
+void DMAInstrumenter::moveLiteralForFunc(Function &F, vector<Mutation*> *v) {
+  int instrumented_insts = 0;
+  BasicBlock::iterator cur_it;
+  for (unsigned i = 0; i < v->size(); ++i) {
+    int cur_index = (*v)[i]->index;
+    for (unsigned j = i + 1; j < v->size(); ++j) {
+      if ((*v)[j]->index == cur_index) {
+        i = j;
+      } else {
+        break;
+      }
+    }
+    cur_it = getLocation(F, instrumented_insts, cur_index);
+
+    if(dyn_cast<CallInst>(&*cur_it)){
+			//move all constant literal and SSA value to repalce to alloca, e.g foo(a+5)->b = a+5;foo(b)
+			for (auto OI = cur_it->op_begin(), OE = cur_it->op_end(); OI != OE; ++OI){
+				if(ConstantInt* cons = dyn_cast<ConstantInt>(&*OI)){
+					AllocaInst *alloca = new AllocaInst(cons->getType(), 0, (cons->getName().str()+".alias"), &*cur_it);
+					/*StoreInst *str = */new StoreInst(cons, alloca, &*cur_it);
+					LoadInst *ld = new LoadInst(alloca, (cons->getName().str()+".ld"), &*cur_it);
+					*OI = (Value*) ld;
+					instrumented_insts += 3;//add 'alloca', 'store' and 'load'
+				}
+				else if(Instruction* oinst = dyn_cast<Instruction>(&*OI)){
+					if(oinst->isBinaryOp() ||
+						(oinst->getOpcode() == Instruction::Call) ||
+						isHandledCoveInst(oinst) ||
+						(oinst->getOpcode() == Instruction::PHI) ||
+						(oinst->getOpcode() == Instruction::Select) ){
+						AllocaInst *alloca = new AllocaInst(oinst->getType(), 0, (oinst->getName().str()+".ptr"), &*cur_it);
+						/*StoreInst *str = */new StoreInst(oinst, alloca, &*cur_it);
+						LoadInst *ld = new LoadInst(alloca, (oinst->getName().str()+".ld"), &*cur_it);
+						*OI = (Value*) ld;
+						instrumented_insts += 3;
+					}
+				}
+			}
+    } else if (StoreInst *st = dyn_cast<StoreInst>(&*cur_it)) {
+			if(ConstantInt* cons = dyn_cast<ConstantInt>(st->getValueOperand())){
+        AllocaInst *alloca = new AllocaInst(cons->getType(), 0, "cons_alias", st);
+        StoreInst *str = new StoreInst(cons, alloca, st);
+        LoadInst *ld = new LoadInst(alloca, "const_load", st);
+        User::op_iterator OI = st->op_begin();
+        *OI = (Value*) ld;
+        instrumented_insts += 3;
+			}
+    }
+  }
 }
 
 void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
@@ -510,23 +712,24 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 		mut_from = tmp.front()->id;
 		mut_to = tmp.back()->id;
 
-		if(tmp.size() >= MAX_MUT_NUM_PER_LOCATION){
-			ERRMSG("TOO MANY MUTS ");
-			llvm::errs()<<"CUR_INST: "<<tmp.front()->index<<"\t(FROM: "
-				<<mut_from<<"\tTO: "<<mut_to<<")\t"<<*cur_it<<"\n";
-			exit(0);
-		}
+    llvm::errs() << "CUR_INST: " << tmp.front()->index
+                 << "  (FROM:" << mut_from << "  TO:" << mut_to <<  ")\t"
+                 << *cur_it << "\n";
 
-		llvm::errs()<<"CUR_INST: "<<tmp.front()->index<<"\t(FROM: "
-			<<mut_from<<"\tTO: "<<mut_to<<")\t"<<*cur_it<<"\n";
+    if(tmp.size() >= MAX_MUT_NUM_PER_LOCATION){
+      ERRMSG("TOO MANY MUTS ");
+      exit(0);
+    }
 
 		if(dyn_cast<CallInst>(&*cur_it)){
+
 			//move all constant literal and SSA value to repalce to alloca, e.g foo(a+5)->b = a+5;foo(b)
 			for (auto OI = cur_it->op_begin(), OE = cur_it->op_end(); OI != OE; ++OI){
 				if(ConstantInt* cons = dyn_cast<ConstantInt>(&*OI)){
 					AllocaInst *alloca = new AllocaInst(cons->getType(), 0, (cons->getName().str()+".alias"), &*cur_it);
-					/*StoreInst *str = */new StoreInst(cons, alloca, &*cur_it);
+					StoreInst *str = new StoreInst(cons, alloca, &*cur_it);
 					LoadInst *ld = new LoadInst(alloca, (cons->getName().str()+".ld"), &*cur_it);
+          canMove[ld] = true;
 					*OI = (Value*) ld;
 					instrumented_insts += 3;//add 'alloca', 'store' and 'load'
 				}
@@ -537,15 +740,23 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 						(oinst->getOpcode() == Instruction::PHI) ||
 						(oinst->getOpcode() == Instruction::Select) ){
 						AllocaInst *alloca = new AllocaInst(oinst->getType(), 0, (oinst->getName().str()+".ptr"), &*cur_it);
-						/*StoreInst *str = */new StoreInst(oinst, alloca, &*cur_it);
+						StoreInst *str = new StoreInst(oinst, alloca, &*cur_it);
 						LoadInst *ld = new LoadInst(alloca, (oinst->getName().str()+".ld"), &*cur_it);
+            canMove[ld] = true;
 						*OI = (Value*) ld;
 						instrumented_insts += 3;
 
 					}
-				}
+				} else if (Argument *argu = dyn_cast<Argument>(&*OI)) {
+          AllocaInst *alloca = new AllocaInst(argu->getType(), 0, (argu->getName().str() + ".alias"), &*cur_it);
+          StoreInst *str = new StoreInst(argu, alloca, &*cur_it);
+          LoadInst *ld = new LoadInst(alloca, (argu->getName().str() + ".ld"), &*cur_it);
+          canMove[ld] = true;
+          *OI = (Value*)ld;
+          instrumented_insts += 3;
+        }
 
-			}
+        }
 
 			Function* precallfunc = TheModule->getFunction("__accmut__prepare_call");
 
@@ -609,8 +820,8 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					record_num++;
 				}
 				else{
-					//ERRMSG("---- WARNNING : PUSH PARAM FAILURE ");
-					//VALERRMSG(cur_it,"CUR_OPRAND",v);
+					ERRMSG("---- WARNNING : PUSH PARAM FAILURE ");
+					VALERRMSG(cur_it,"CUR_OPRAND",v);
 				}
 
 			}
@@ -621,6 +832,7 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 					llvm::errs()<<*it<<"'th\t";
 				}
 				llvm::errs()<<"\n";
+        llvm::errs() << *cur_it << "\n";
 			}
 
 			//insert num of param-records
@@ -653,30 +865,54 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 
 			BranchInst::Create(label_if_then, label_if_else, hasstd, cur_bb);
 
+
 			//label_if_then
 			//move the loadinsts of params into if_then_block
-			index = 0;
+      index = 0;
 			for (auto OI = oricall->op_begin(), OE = oricall->op_end() - 1; OI != OE; ++OI, ++index){
+        continue;
 
 				//only move pushed parameters
 				if(find(pushed_param_idx.begin(), pushed_param_idx.end(), index) == pushed_param_idx.end()){
 					continue;
 				}
+        if (Argument *arg = dyn_cast<Argument>(&*OI)) {
+          llvm::errs() << "Can't move arguments: " << *(OI->get()) << "\n";
+          continue;
+        }
+        if (canMove.find(OI->get()) == canMove.end()) {
+          llvm::errs() << "DON'T KNOW IF IT CAN MOVE\t" << *(OI->get()) << "\n";
+          exit(-1);
+        }
+        if (canMove[OI->get()] == false) {
+          llvm::errs() << "Can move == false: " << *(OI->get()) << "\n";
+          continue;
+        }
 
 				if(LoadInst *ld = dyn_cast<LoadInst>(&*OI)){
-					ld->removeFromParent();
+          ld->removeFromParent();
 					label_if_then->getInstList().push_back(ld);
-				}else if(/*Constant *con = */dyn_cast<Constant>(&*OI)){
+          // auto newld = ld->clone();
+          // OI->set(newld);
+          // label_if_then->getInstList().push_back(newld);
+          // instrumented_insts++;
+				}else if(
+          // Constant *con =
+          dyn_cast<Constant>(&*OI)){
 					// TODO::  test
 					continue;
 				}else if(GetElementPtrInst *ge = dyn_cast<GetElementPtrInst>(&*OI)){
 					// TODO: test
 					ge->removeFromParent();
 					label_if_then->getInstList().push_back(ge);
-                }else if (Operator *op = dyn_cast<Operator>(&*OI)) {
+          // auto newge = ge->clone();
+          // OI->set(newge);
+          // label_if_then->getInstList().push_back(newge);
+          // instrumented_insts++;
+        }else if (Operator *op = dyn_cast<Operator>(&*OI)) {
                     ERRMSG("Operator");
                     exit(0);
-                } else {
+        } else {
 					// TODO:: check
 					// TODO:: instrumented_insts !!!
 					Instruction *coversion = dyn_cast<Instruction>(&*OI);
@@ -688,6 +924,13 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 							label_if_then->getInstList().push_back(op_of_cov);
 							coversion->removeFromParent();
 							label_if_then->getInstList().push_back(coversion);
+              // auto new_op_of_cov = op_of_cov->clone();
+              // auto new_coversion = coversion->clone();
+              // new_coversion->setOperand(0, new_op_of_cov);
+              // OI->set(new_coversion);
+              // label_if_then->getInstList().push_back(new_op_of_cov);
+              // label_if_then->getInstList().push_back(new_coversion);
+              // instrumented_insts+=2;
 						}else{
 							ERRMSG("CAN MOVE GET A POINTER INTO IF.THEN");
 							Value *v = dyn_cast<Value>(&*OI);
@@ -830,15 +1073,16 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation*> * v){
 		}
 
 		else if(StoreInst* st = dyn_cast<StoreInst>(&*cur_it)){
+
 			// TODO:: add or call inst?
 			if(ConstantInt* cons = dyn_cast<ConstantInt>(st->getValueOperand())){
-					AllocaInst *alloca = new AllocaInst(cons->getType(), 0, "cons_alias", st);
-					/*StoreInst *str = */new StoreInst(cons, alloca, st);
+        AllocaInst *alloca = new AllocaInst(cons->getType(), 0, "cons_alias", st);
+					StoreInst *str = new StoreInst(cons, alloca, st);
 					LoadInst *ld = new LoadInst(alloca, "const_load", st);
 					User::op_iterator OI = st->op_begin();
 					*OI = (Value*) ld;
 					instrumented_insts += 3;
-			}
+      }
 
 			Function* prestfunc;
 			if(st->getValueOperand()->getType()->isIntegerTy(32)){
@@ -1252,7 +1496,9 @@ bool DMAInstrumenter::hasMutation(Instruction *inst, vector<Mutation*>* v){
 
 /*------------------reserved begin-------------------*/
 void DMAInstrumenter::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.setPreservesAll();
+  // AU.setPreservesAll();
+  AU.addRequired<AAResultsWrapperPass>();
+  AU.addRequired<MemoryDependenceWrapperPass>();
 }
 
 char DMAInstrumenter::ID = 0;
