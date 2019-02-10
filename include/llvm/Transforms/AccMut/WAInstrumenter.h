@@ -29,8 +29,7 @@ using std::map;
 using std::set;
 using std::string;
 
-class WAInstrumenter : public ModulePass
-{
+class WAInstrumenter : public ModulePass {
 public:
 
     static char ID;// Pass identification, replacement for typeid
@@ -55,29 +54,45 @@ private:
     Function *goodVarI64ArithFunc;
     Function *goodVarI32CmpFunc;
     Function *goodVarI64CmpFunc;
+
     void setGoodVarFunc();
+
     void setGoodVarVoidFunc(Function *&F, string name, Type *voidType);
+
     void setGoodVarBinaryFunc(Function *&F, string name, Type *retType, Type *paramType);
 
-    map<Instruction*, vector<Mutation*>> instMutsMap;
-    void getInstMutsMap(vector<Mutation*> *v, Function &F);
+    map<Instruction *, vector<Mutation *>> instMutsMap;
 
-    map<Instruction*, int> goodVariables;
+    void getInstMutsMap(vector<Mutation *> *v, Function &F);
+
+    map<Instruction *, int> goodVariables;
+
     void getGoodVariables(BasicBlock &BB);
+
     void filterRealGoodVariables();
+
     bool hasUsedPreviousGoodVariables(Instruction *I);
-    void pushGoodVarIdInfo(vector<Value*> &params, Instruction *I);
-    ConstantInt* getGoodVarId(Value *I);
-    ConstantInt* getI32Constant(int value);
+
+    void pushGoodVarIdInfo(vector<Value *> &params, Instruction *I);
+
+    ConstantInt *getGoodVarId(Value *I);
+
+    ConstantInt *getI32Constant(int value);
 
     bool instrument(BasicBlock &BB);
+
     void instrumentAboutGoodVariable(Instruction &I);
+
     void instrumentAsDMA(Instruction &I, bool aboutGoodVariable = false);
 
     static bool isSupportedOpcode(Instruction *I);
+
     static bool isSupportedOp(Instruction *I);
+
     static bool isSupportedInstruction(Instruction *I);
+
     static bool isSupportedBoolInstruction(Instruction *I);
+
     static bool isSupportedType(Value *V);
 };
 

@@ -48,41 +48,41 @@ extern int HOLDER[1024];
 
 extern int TEST_ID;
 
-typedef enum MTYPE{
-	AOR, /* 0 */
-	LOR, /* 1 */
-	COR, /* 2 */
-	ROR, /* 3 */
-	SOR, /* 4 */
-	STD, /* 5 */
-	LVR, /* 6 */
-	UOI, /* 7 */
-	ROV, /* 8 */
-	ABV  /* 9 */
-}MType;
+typedef enum MTYPE {
+    AOR, /* 0 */
+    LOR, /* 1 */
+    COR, /* 2 */
+    ROR, /* 3 */
+    SOR, /* 4 */
+    STD, /* 5 */
+    LVR, /* 6 */
+    UOI, /* 7 */
+    ROV, /* 8 */
+    ABV  /* 9 */
+} MType;
 
-typedef struct Mutation{
-	MType type;
+typedef struct Mutation {
+    MType type;
 
-	#if ACCMUT_STATIC_ANALYSIS_EVAL
-	int location;
-	#endif
+#if ACCMUT_STATIC_ANALYSIS_EVAL
+    int location;
+#endif
 
-	//src operand, for all muts
-	int sop;
+    //src operand, for all muts
+    int sop;
 
-	//AOR,LOR->t_op
-	//LVR,ABV->index;
-	int op_0;
+    //AOR,LOR->t_op
+    //LVR,ABV->index;
+    int op_0;
 
-	//ROR->s_pre & t_pre
-	//LVR->src_const & tar_const
-	//ROV->op1 & op2
-	//STD->func_type & retval
-	//UOI->idx & tp
-	long op_1;
-	long op_2;
-}Mutation;
+    //ROR->s_pre & t_pre
+    //LVR->src_const & tar_const
+    //ROV->op1 & op2
+    //STD->func_type & retval
+    //UOI->idx & tp
+    long op_1;
+    long op_2;
+} Mutation;
 
 typedef struct RegMutInfo {
     Mutation *ptr;
@@ -95,7 +95,7 @@ typedef struct RegMutInfo {
 
 #define MUTFILELINE 128
 
-extern Mutation* ALLMUTS[MAXMUTNUM + 1];
+extern Mutation *ALLMUTS[MAXMUTNUM + 1];
 extern int MUT_NUM;
 
 extern struct timeval tv_begin, tv_end;
@@ -115,10 +115,10 @@ extern struct timeval tv_begin, tv_end;
 int __real_fprintf(FILE *fp, const char *format, ...);
 
 #define ERRMSG(msg) __real_fprintf(stderr, "%s @ %s->%s():%d\tMID: %d\tTID: %d\n", \
-	msg,__FILE__, __FUNCTION__, __LINE__, MUTATION_ID, TEST_ID)
+    msg,__FILE__, __FUNCTION__, __LINE__, MUTATION_ID, TEST_ID)
 
-#define ERRMSG2(msg,i) __real_fprintf(stderr, "%s : %d @ %s->%s():%d\tMID: %d\tTID: %d\n", \
-	msg, i,__FILE__, __FUNCTION__, __LINE__, MUTATION_ID, TEST_ID)
+#define ERRMSG2(msg, i) __real_fprintf(stderr, "%s : %d @ %s->%s():%d\tMID: %d\tTID: %d\n", \
+    msg, i,__FILE__, __FUNCTION__, __LINE__, MUTATION_ID, TEST_ID)
 
 
 /************* ALL EXIT HANDLER ***************************/
@@ -138,7 +138,6 @@ void __accmut__exec_inst_nums();
 void __accmut__debug(int index);
 
 void __accmut__load_all_muts();
-
 
 
 #endif

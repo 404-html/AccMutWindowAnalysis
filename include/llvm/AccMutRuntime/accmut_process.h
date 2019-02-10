@@ -14,10 +14,11 @@
 #define INT_TP 2
 #define LONG_TP 3
 
-typedef struct PrepareCallParam{
-	int type;
-	unsigned long address;
-}PrepareCallParam;
+typedef struct PrepareCallParam {
+    int type;
+    unsigned long address;
+} PrepareCallParam;
+
 /**********************************************************/
 
 void __accmut__init(void);
@@ -42,7 +43,7 @@ int __accmut__process_i64_cmp(RegMutInfo *rmi, int from, int to, long left, long
 
 int __accmut__prepare_st_i32(RegMutInfo *rmi, int from, int to, int tobestore, int *addr);
 
-int __accmut__prepare_st_i64(RegMutInfo *rmi, int from, int to, long tobestore, long* addr);
+int __accmut__prepare_st_i64(RegMutInfo *rmi, int from, int to, long tobestore, long *addr);
 
 void __accmut__std_store(void);
 

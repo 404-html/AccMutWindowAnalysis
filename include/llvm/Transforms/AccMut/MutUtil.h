@@ -26,8 +26,6 @@
 #include <llvm/IR/Module.h>
 
 
-
-
 #include<map>
 #include<vector>
 #include<string>
@@ -36,17 +34,22 @@
 using namespace std;
 using namespace llvm;
 
-class MutUtil{
+class MutUtil {
 public:
-	static map<string, vector<Mutation*>* > AllMutsMap;
-	static vector<Mutation*> AllMutsVec;
-	static void getAllMutations(const string &path);
-	static void dumpAllMuts();
-	static BasicBlock::iterator getLocation(Function &F, int instrumented_insts, int index);
-    static int getOperandPtrDimension(Value* v);
-	static bool allMutsGeted;
+    static map<string, vector<Mutation *> *> AllMutsMap;
+    static vector<Mutation *> AllMutsVec;
+
+    static void getAllMutations(const string &path);
+
+    static void dumpAllMuts();
+
+    static BasicBlock::iterator getLocation(Function &F, int instrumented_insts, int index);
+
+    static int getOperandPtrDimension(Value *v);
+
+    static bool allMutsGeted;
 private:
-	static Mutation * getMutation(string line, int id);
+    static Mutation *getMutation(string line, int id);
 };
 
 

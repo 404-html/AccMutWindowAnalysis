@@ -1,8 +1,8 @@
 //===----------------------------------------------------------------------===//
 //
- // This file implements the mutation generator pass
+// This file implements the mutation generator pass
 // 
- // Add by Wang Bo. OCT 19, 2015
+// Add by Wang Bo. OCT 19, 2015
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,30 +16,46 @@
 
 using namespace llvm;
 
-class MutationGen: public ModulePass{
+class MutationGen : public ModulePass {
 public:
-	static char ID;// Pass identification, replacement for typeid
-	virtual void getAnalysisUsage(AnalysisUsage &AU) const;
+    static char ID;// Pass identification, replacement for typeid
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const;
 
-	Module *TheModule;
-	static std::ofstream  ofresult; 
-	MutationGen(/*Module *M*/);
-	virtual bool runOnModule(Module &M);
-	static void genMutationFile(Function &F);
-	static std::string getMutationFilePath();
-	static bool firstFunctionSeen;
+    Module *TheModule;
+    static std::ofstream ofresult;
+
+    MutationGen(/*Module *M*/);
+
+    virtual bool runOnModule(Module &M);
+
+    static void genMutationFile(Function &F);
+
+    static std::string getMutationFilePath();
+
+    static bool firstFunctionSeen;
 private:
-	bool runOnFunction(Function &F);
-	static void genAOR(Instruction *inst,StringRef fname, int index);
-	static void genLOR(Instruction *inst, StringRef fname, int index);
-	static void genCOR();
-	static void genROR(Instruction *inst,StringRef fname, int index);
-	static void genSOR();
-	static void genSTDCall(Instruction *inst,StringRef fname, int index);
-    static void genSTDStore(Instruction *inst,StringRef fname, int index);
-	static void genLVR(Instruction *inst, StringRef fname, int index);
+    bool runOnFunction(Function &F);
+
+    static void genAOR(Instruction *inst, StringRef fname, int index);
+
+    static void genLOR(Instruction *inst, StringRef fname, int index);
+
+    static void genCOR();
+
+    static void genROR(Instruction *inst, StringRef fname, int index);
+
+    static void genSOR();
+
+    static void genSTDCall(Instruction *inst, StringRef fname, int index);
+
+    static void genSTDStore(Instruction *inst, StringRef fname, int index);
+
+    static void genLVR(Instruction *inst, StringRef fname, int index);
+
     static void genUOI(Instruction *inst, StringRef fname, int index);
+
     static void genROV(Instruction *inst, StringRef fname, int index);
+
     static void genABV(Instruction *inst, StringRef fname, int index);
 };
 

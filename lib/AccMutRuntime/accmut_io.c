@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -35,15 +34,15 @@ size_t CUR_STDERR = 0;
 /***********************************************************/
 
 #define DEF_STDFILE(NAME, FD, BUF, MAXSIZE, FLAGS, ORINAME) \
-	ACCMUT_FILE NAME = {FLAGS, FD, BUF, (BUF + MAXSIZE), BUF, BUF, 0, NULL, 0, ORINAME}
+    ACCMUT_FILE NAME = {FLAGS, FD, BUF, (BUF + MAXSIZE), BUF, BUF, 0, NULL, 0, ORINAME}
 
-DEF_STDFILE(stdfile_0, 0, (char*)NULL, 0, 0, "stdin");	//unimplemented stdin
+DEF_STDFILE(stdfile_0, 0, (char *) NULL, 0, 0, "stdin");    //unimplemented stdin
 DEF_STDFILE(stdfile_1, 1, STDOUT_BUFF, MAX_STDOUT_BUF_SIZE, O_WRONLY, "stdout");
 DEF_STDFILE(stdfile_2, 2, STDERR_BUFF, MAX_STDERR_BUF_SIZE, O_WRONLY, "stderr");
 
-ACCMUT_FILE* accmut_stdin = &stdfile_0;
-ACCMUT_FILE* accmut_stdout = &stdfile_1;
-ACCMUT_FILE* accmut_stderr = &stdfile_2;
+ACCMUT_FILE *accmut_stdin = &stdfile_0;
+ACCMUT_FILE *accmut_stdout = &stdfile_1;
+ACCMUT_FILE *accmut_stderr = &stdfile_2;
 
 int __real_fprintf(FILE *fp, const char *format, ...) {
     va_list ap;
@@ -78,7 +77,7 @@ int __real_fprintf(FILE *fp, const char *format, ...) {
 /*********************** FILE OPTIONS ****************************************/
 
 
-ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
+ACCMUT_FILE *__accmut__fopen(const char *path, const char *mode) {
 
     int omode;
     int oflags = 0;
@@ -86,14 +85,13 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
     const char *orimode = mode;
     int needTrunc = 0;
 
-    switch(*mode++)
-    {
+    switch (*mode++) {
         case 'r':
             omode = O_RDONLY;
             break;
         case 'w':
             omode = O_WRONLY;
-            oflags = O_CREAT|O_TRUNC;
+            oflags = O_CREAT | O_TRUNC;
             needTrunc = 1;
             break;
             // case 'a':
@@ -109,11 +107,11 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
     // }
 
     /** new **/
-    ACCMUT_FILE *fp = (ACCMUT_FILE *)malloc(sizeof(ACCMUT_FILE));
-    if(fp == NULL)
+    ACCMUT_FILE *fp = (ACCMUT_FILE *) malloc(sizeof(ACCMUT_FILE));
+    if (fp == NULL)
         return NULL;
 
-    fp->filename = (char *)malloc(strlen(path) + 10);
+    fp->filename = (char *) malloc(strlen(path) + 10);
     strcpy(fp->filename, path);
     CALLLOG(fp);
 
@@ -130,7 +128,7 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
         fp->usetmp = 0;
     }
 
-    if(_fd < 0){
+    if (_fd < 0) {
 #if ACCMUT_IO_DEBUG
         fprintf(stdout, "OPEN ERROR, PATH: \"%s\", MODE: %d  @__accmut__fopen. TID: %d , MUT: %d\n", path, omode, TEST_ID, MUTATION_ID);
 #endif
@@ -159,13 +157,13 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
     /** end original **/
 
 
-    if(omode == O_RDONLY){
+    if (omode == O_RDONLY) {
 
         struct stat sb;
-        if(fstat(_fd, &sb) == -1){
+        if (fstat(_fd, &sb) == -1) {
             return NULL;
         }
-        if(sb.st_size > MAX_IN_BUF_SIZE){
+        if (sb.st_size > MAX_IN_BUF_SIZE) {
 #if ACCMUT_IO_DEBUG
             fprintf(stderr, "INPUT FILE : %s IS TOO BIG. TID: %d, MUT: %d\n", path, TEST_ID, MUTATION_ID);
 #endif
@@ -188,14 +186,14 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
             }
         }
 
-    }else if(omode == O_WRONLY){
+    } else if (omode == O_WRONLY) {
 
         fp->flags = O_WRONLY;
         fp->fd = _fd;
-        fp->bufbase = fp->write_cur = (char*) calloc(1, MAX_FILE_BUF_SIZE*(sizeof(char)) );
+        fp->bufbase = fp->write_cur = (char *) calloc(1, MAX_FILE_BUF_SIZE * (sizeof(char)));
         fp->read_cur = NULL;
         fp->fsize = 0;
-        fp->bufend = fp->bufbase + MAX_FILE_BUF_SIZE*(sizeof(char));
+        fp->bufend = fp->bufbase + MAX_FILE_BUF_SIZE * (sizeof(char));
         if (MUTATION_ID == 0) {
             fp->orifile = fopen(path, orimode);
             if (fp->orifile == NULL) {
@@ -214,7 +212,7 @@ ACCMUT_FILE* __accmut__fopen(const char *path, const char *mode){
 }
 
 
-int __accmut__fclose(ACCMUT_FILE *fp){
+int __accmut__fclose(ACCMUT_FILE *fp) {
     CALLLOG(fp);
     //if (fp->filename)
     //    free(fp->filename);
@@ -225,11 +223,11 @@ int __accmut__fclose(ACCMUT_FILE *fp){
     if (fp->orifile) {
         status = fclose(fp->orifile);
     }
-    if(fp->flags == O_RDONLY){
+    if (fp->flags == O_RDONLY) {
         status = status & munmap(fp->bufbase, fp->fsize);
         status = status & close(fp->fd);
         free(fp);
-    }else if(fp->flags == O_WRONLY){
+    } else if (fp->flags == O_WRONLY) {
 
         // if(fp == accmut_stdout || fp == accmut_stderr){
         // 	fp->bufend = fp->bufbase;	// TODO
@@ -241,7 +239,7 @@ int __accmut__fclose(ACCMUT_FILE *fp){
 
         //fprintf(stderr, "  Close : %d  %d  %d\n", fp->fd, status, MUTATION_ID);
         // TODO: save results
-        if(fp->fd != 1 && fp->fd != 2){
+        if (fp->fd != 1 && fp->fd != 2) {
             free(fp->bufbase);
             free(fp);
         }
@@ -250,13 +248,13 @@ int __accmut__fclose(ACCMUT_FILE *fp){
 }
 
 
-int __accmut__feof(ACCMUT_FILE *fp){
+int __accmut__feof(ACCMUT_FILE *fp) {
     CALLLOG(fp);
 
-    if(fp == NULL){
+    if (fp == NULL) {
         return EOF;
     }
-    if((fp->flags & O_RDONLY) == 0){
+    if ((fp->flags & O_RDONLY) == 0) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "OPLY SUPPORT O_RDONLY MODE @__accmut__feof\n");
 #endif
@@ -267,43 +265,43 @@ int __accmut__feof(ACCMUT_FILE *fp){
     return result;
 }
 
-int __accmut__fseek(ACCMUT_FILE *fp, size_t offset, int loc){
+int __accmut__fseek(ACCMUT_FILE *fp, size_t offset, int loc) {
     CALLLOG(fp);
     //TODO
     return 0;
 }
 
-int __accmut__ferror(ACCMUT_FILE *fp){
+int __accmut__ferror(ACCMUT_FILE *fp) {
     CALLLOG(fp);
     //TODO:
     return 0;
 }
 
-int __accmut__fileno(ACCMUT_FILE *fp){
+int __accmut__fileno(ACCMUT_FILE *fp) {
     CALLLOG(fp);
     return fp->fd;
 }
 
-ACCMUT_FILE * __accmut__freopen(const char *path, const char *mode, ACCMUT_FILE *fp){
+ACCMUT_FILE *__accmut__freopen(const char *path, const char *mode, ACCMUT_FILE *fp) {
     CALLLOG(fp);
-    ACCMUT_FILE * newfp = __accmut__fopen(path, mode);
-    if(newfp == NULL){
+    ACCMUT_FILE *newfp = __accmut__fopen(path, mode);
+    if (newfp == NULL) {
         return NULL;
     }
 
     int status = close(fp->fd);
 
-    if(fp->fd > 2){//not stdin, stdout, stderr
-        if(fp->flags == O_RDONLY){
+    if (fp->fd > 2) {//not stdin, stdout, stderr
+        if (fp->flags == O_RDONLY) {
             status = munmap(fp->bufbase, fp->fsize);
             status = status & close(fp->fd);
-        }else if(fp->flags == O_WRONLY){
+        } else if (fp->flags == O_WRONLY) {
             status = close(fp->fd);
             free(fp->bufbase);
         }
     }
 
-    if(status < 0){
+    if (status < 0) {
         return NULL;
     }
 
@@ -315,11 +313,11 @@ ACCMUT_FILE * __accmut__freopen(const char *path, const char *mode, ACCMUT_FILE 
     // fp->bufend = newfp->bufend;
     // fp->fsize = newfp->fsize;
 
-    if(fp->fd == 1){
+    if (fp->fd == 1) {
         accmut_stdout = newfp;
-    }else if(fp->fd == 2){
+    } else if (fp->fd == 2) {
         accmut_stderr = newfp;
-    }else{
+    } else {
         fprintf(stderr, "FREOPEN ERROR @__accmut__freopen. TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
     }
 
@@ -327,24 +325,24 @@ ACCMUT_FILE * __accmut__freopen(const char *path, const char *mode, ACCMUT_FILE 
 }
 
 /*********************** POSIX FILE ****************************************/
-int __accmut__unlink(const char *pathname){
+int __accmut__unlink(const char *pathname) {
     CALLLOG();
 
-    if(MUTATION_ID == 0){// only main process can unlink the tmp file
+    if (MUTATION_ID == 0) {// only main process can unlink the tmp file
         return unlink(pathname);
-    }else{
+    } else {
         return 0;
     }
 }
 
 /*********************** INPUT ****************************************/
 
-char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp){
+char *__accmut__fgets(char *buf, int size, ACCMUT_FILE *fp) {
     CALLLOG(fp);
-    if(size <= 0)
+    if (size <= 0)
         return NULL;
 
-    if(fp->read_cur - fp->bufbase >= fp->fsize){
+    if (fp->read_cur - fp->bufbase >= fp->fsize) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "READ OVERFLOW @ __accmut__fgets, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -354,19 +352,19 @@ char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp){
 
     size_t len = size - 1;
 
-    char *t = (char*) memchr((void*) fp->read_cur, '\n', len);
+    char *t = (char *) memchr((void *) fp->read_cur, '\n', len);
 
-    if(t != NULL){
+    if (t != NULL) {
         len = t - fp->read_cur;
         ++t;
         ++len;
     }
 
-    if(len == 0){
+    if (len == 0) {
         return NULL;
     }
 
-    memcpy((void *) buf , (void *) fp->read_cur, len);
+    memcpy((void *) buf, (void *) fp->read_cur, len);
 
     fp->read_cur = fp->read_cur + len;
 
@@ -412,9 +410,9 @@ char* __accmut__fgets(char *buf, int size, ACCMUT_FILE *fp){
     return buf;
 }
 
-int __accmut__getc(ACCMUT_FILE *fp){
+int __accmut__getc(ACCMUT_FILE *fp) {
     CALLLOG(fp);
-    if(fp->read_cur - fp->bufbase >= fp->fsize){
+    if (fp->read_cur - fp->bufbase >= fp->fsize) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "READ OVERFLOW @ __accmut__getc, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -439,7 +437,7 @@ int __accmut__fgetc(ACCMUT_FILE *fp) {
     return __accmut__getc(fp);
 }
 
-size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
+size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp) {
     CALLLOG(fp);
     ssize_t bytes_requested = size * count;
     if (bytes_requested == 0)
@@ -449,14 +447,14 @@ size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
 
     char *s = buf;
 
-    if(fp->read_cur + bytes_requested > fp->bufend){
+    if (fp->read_cur + bytes_requested > fp->bufend) {
 
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "READ OVERFLOW @ __accmut__fread\n");
 #endif
 
         memcpy(s, fp->read_cur, fp->bufend - fp->read_cur);
-        size_t res = (fp->bufend - fp->read_cur)/size;
+        size_t res = (fp->bufend - fp->read_cur) / size;
         fp->read_cur = fp->bufend;
         //fprintf(stderr, "%s\n", s);
         fp->flags |= _IO_EOF_SEEN;
@@ -497,13 +495,13 @@ size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
     return count;
 }
 
-int __accmut__ungetc(int c, ACCMUT_FILE *fp){
+int __accmut__ungetc(int c, ACCMUT_FILE *fp) {
     CALLLOG(fp);
 
-    if(c == EOF)
+    if (c == EOF)
         return EOF;
 
-    if(fp->flags != O_RDONLY){
+    if (fp->flags != O_RDONLY) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "UNGETC OF NON-READABLE-FILE @ __accmut__ungetc, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
 #endif
@@ -511,13 +509,11 @@ int __accmut__ungetc(int c, ACCMUT_FILE *fp){
     }
 
     int res;
-    if(fp->read_cur > fp->bufbase
-       && (unsigned char) fp->read_cur[-1] == (unsigned char) c)
-    {
+    if (fp->read_cur > fp->bufbase
+        && (unsigned char) fp->read_cur[-1] == (unsigned char) c) {
         (fp->read_cur)--;
         res = (unsigned char) c;
-    }
-    else
+    } else
         res = EOF;
 
     if (res != EOF)
@@ -555,9 +551,8 @@ int __accmut__ungetc(int c, ACCMUT_FILE *fp){
 static char Xtable[NR_CHARS];
 static char inp_buf[NUMLEN];
 
-static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, char type,
-                                  unsigned int width, int *basep)
-{
+static char *__accmut__o_collect(register int c, register ACCMUT_FILE *stream, char type,
+                                 unsigned int width, int *basep) {
     register char *bufp = inp_buf;
     register int base;
 
@@ -565,11 +560,19 @@ static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, 
         case 'i':   /* i means octal, decimal or hexadecimal */
         case 'p':
         case 'x':
-        case 'X':   base = 16;  break;
+        case 'X':
+            base = 16;
+            break;
         case 'd':
-        case 'u':   base = 10;  break;
-        case 'o':   base = 8;   break;
-        case 'b':   base = 2;   break;
+        case 'u':
+            base = 10;
+            break;
+        case 'o':
+            base = 8;
+            break;
+        case 'b':
+            base = 2;
+            break;
     }
 
     if (c == '-' || c == '+') {
@@ -584,14 +587,12 @@ static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, 
             c = __accmut__getc(stream);
         if (c != 'x' && c != 'X') {
             if (type == 'i') base = 8;
-        }
-        else if (width) {
+        } else if (width) {
             *bufp++ = c;
             if (--width)
                 c = __accmut__getc(stream);
         }
-    }
-    else if (type == 'i') base = 10;
+    } else if (type == 'i') base = 10;
 
     while (width) {
         if (((base == 10) && isdigit(c))
@@ -601,8 +602,7 @@ static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, 
             *bufp++ = c;
             if (--width)
                 c = __accmut__getc(stream);
-        }
-        else break;
+        } else break;
     }
 
     if (width && c != EOF) __accmut__ungetc(c, stream);
@@ -614,6 +614,7 @@ static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, 
 
 
 #ifndef NOFLOAT
+
 /* The function f_collect() reads a string that has the format of a
  * floating-point number. The function returns as soon as a format-error
  * is encountered, leaving the offending character in the input. This means
@@ -622,8 +623,7 @@ static char * __accmut__o_collect(register int c, register ACCMUT_FILE *stream, 
  * not necessary, although the use of the width field can cause incomplete
  * numbers to be passed to strtod(). (e.g. 1.3e+)
  */
-static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, register unsigned int width)
-{
+static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, register unsigned int width) {
     register char *bufp = inp_buf;
     int digit_seen = 0;
 
@@ -641,7 +641,7 @@ static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, r
     }
     if (width && c == '.') {
         *bufp++ = c;
-        if(--width)
+        if (--width)
             c = __accmut__getc(stream);
         while (width && isdigit(c)) {
             digit_seen++;
@@ -654,8 +654,7 @@ static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, r
     if (!digit_seen) {
         if (width && c != EOF) __accmut__ungetc(c, stream);
         return inp_buf - 1;
-    }
-    else digit_seen = 0;
+    } else digit_seen = 0;
 
     if (width && (c == 'e' || c == 'E')) {
         *bufp++ = c;
@@ -673,7 +672,7 @@ static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, r
                 c = __accmut__getc(stream);
         }
         if (!digit_seen) {
-            if (width && c != EOF) __accmut__ungetc(c,stream);
+            if (width && c != EOF) __accmut__ungetc(c, stream);
             return inp_buf - 1;
         }
     }
@@ -682,24 +681,24 @@ static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, r
     *bufp = '\0';
     return bufp - 1;
 }
+
 #endif  /* NOFLOAT */
 
-static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, va_list ap)
-{
-    int        done = 0;    /* number of items done */
-    int        nrchars = 0;    /* number of characters read */
-    int        conv = 0;    /* # of conversions */
-    int        base;        /* conversion base */
-    unsigned long    val;        /* an integer value */
-    register char    *str;        /* temporary pointer */
-    char        *tmp_string;    /* ditto */
-    unsigned    width = 0;    /* width of field */
-    int        flags;        /* some flags */
-    int        reverse;    /* reverse the checking in [...] */
-    int        kind;
-    register int    ic = EOF;    /* the input character */
+static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, va_list ap) {
+    int done = 0;    /* number of items done */
+    int nrchars = 0;    /* number of characters read */
+    int conv = 0;    /* # of conversions */
+    int base;        /* conversion base */
+    unsigned long val;        /* an integer value */
+    register char *str;        /* temporary pointer */
+    char *tmp_string;    /* ditto */
+    unsigned width = 0;    /* width of field */
+    int flags;        /* some flags */
+    int reverse;    /* reverse the checking in [...] */
+    int kind;
+    register int ic = EOF;    /* the input character */
 #ifndef    NOFLOAT
-    long double    ld_val;
+    long double ld_val;
 #endif
 
     if (!*format) return 0;
@@ -714,7 +713,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 ic = __accmut__getc(stream);
                 nrchars++;
             }
-            if (ic != EOF) __accmut__ungetc(ic,stream);
+            if (ic != EOF) __accmut__ungetc(ic, stream);
             nrchars--;
         }
         if (!*format) break;    /* end of format */
@@ -732,8 +731,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
             if (ic == '%') {
                 format++;
                 continue;
-            }
-            else break;
+            } else break;
         }
         flags = 0;
         if (*format == '*') {
@@ -747,9 +745,18 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
         }
 
         switch (*format) {
-            case 'h': flags |= FL_SHORT; format++; break;
-            case 'l': flags |= FL_LONG; format++; break;
-            case 'L': flags |= FL_LONGDOUBLE; format++; break;
+            case 'h':
+                flags |= FL_SHORT;
+                format++;
+                break;
+            case 'l':
+                flags |= FL_LONG;
+                format++;
+                break;
+            case 'L':
+                flags |= FL_LONGDOUBLE;
+                format++;
+                break;
         }
         kind = *format;
         if ((kind != 'c') && (kind != '[') && (kind != 'n')) {
@@ -796,7 +803,8 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 if (str < inp_buf
                     || (str == inp_buf
                         && (*str == '-'
-                            || *str == '+'))) return done;
+                            || *str == '+')))
+                    return done;
 
                 /*
                  * Although the length of the number is str-inp_buf+1
@@ -834,7 +842,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 }
 
                 if (width) {
-                    if (ic != EOF) __accmut__ungetc(ic,stream);
+                    if (ic != EOF) __accmut__ungetc(ic, stream);
                     nrchars--;
                 }
                 break;
@@ -857,7 +865,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 if (!(flags & FL_NOASSIGN))
                     *str = '\0';
                 if (width) {
-                    if (ic != EOF) __accmut__ungetc(ic,stream);
+                    if (ic != EOF) __accmut__ungetc(ic, stream);
                     nrchars--;
                 }
                 break;
@@ -866,14 +874,13 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                     width = 0xffff;
                 if (!width) return done;
 
-                if ( *++format == '^' ) {
+                if (*++format == '^') {
                     reverse = 1;
                     format++;
                 } else
                     reverse = 0;
 
-                for (str = Xtable; str < &Xtable[NR_CHARS]
-                        ; str++)
+                for (str = Xtable; str < &Xtable[NR_CHARS]; str++)
                     *str = 0;
 
                 if (*format == ']') Xtable[*format++] = 1;
@@ -884,15 +891,13 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                         format++;
                         if (*format
                             && *format != ']'
-                            && *(format) >= *(format -2)) {
+                            && *(format) >= *(format - 2)) {
                             int c;
 
-                            for( c = *(format -2) + 1
-                                    ; c <= *format ; c++)
+                            for (c = *(format - 2) + 1; c <= *format; c++)
                                 Xtable[c] = 1;
                             format++;
-                        }
-                        else Xtable['-'] = 1;
+                        } else Xtable['-'] = 1;
                     }
                 }
                 if (!*format) return done;
@@ -938,7 +943,8 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 if (str < inp_buf
                     || (str == inp_buf
                         && (*str == '-'
-                            || *str == '+'))) return done;
+                            || *str == '+')))
+                    return done;
 
                 /*
                  * Although the length of the number is str-inp_buf+1
@@ -950,8 +956,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                     ld_val = strtod(inp_buf, &tmp_string);
                     if (flags & FL_LONGDOUBLE)
                         *va_arg(ap, long double *) = (long double) ld_val;
-                    else
-                    if (flags & FL_LONG)
+                    else if (flags & FL_LONG)
                         *va_arg(ap, double *) = (double) ld_val;
                     else
                         *va_arg(ap, float *) = (float) ld_val;
@@ -967,13 +972,13 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
 }
 
 
-int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...){
+int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...) {
     CALLLOG(fp);
-    if(fp->flags & _IO_EOF_SEEN != 0){
-        return  EOF;
+    if (fp->flags & _IO_EOF_SEEN != 0) {
+        return EOF;
     }
 
-    if(fp->read_cur - fp->bufbase >= fp->fsize){
+    if (fp->read_cur - fp->bufbase >= fp->fsize) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "READ OVERFLOW @ __accmut__getc, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -1005,10 +1010,10 @@ int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...){
 
 /*********************** OUTPUT ****************************************/
 
-int __accmut__fputc(int c, ACCMUT_FILE *fp){
+int __accmut__fputc(int c, ACCMUT_FILE *fp) {
     CALLLOG(fp);
 
-    if(fp->write_cur >= fp->bufend){
+    if (fp->write_cur >= fp->bufend) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "OUTPUT OVERFLOW @ __accmut__fputc, ID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -1029,15 +1034,15 @@ int __accmut__fputc(int c, ACCMUT_FILE *fp){
 }
 
 
-int __accmut__fputs(const char* s, ACCMUT_FILE *fp){
+int __accmut__fputs(const char *s, ACCMUT_FILE *fp) {
     CALLLOG(fp);
     int result = EOF;
     size_t len = strlen(s);
-    if(fp->write_cur + len >= fp->bufend){
+    if (fp->write_cur + len >= fp->bufend) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "OUTPUT OVERFLOW @ __accmut__fputs, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
 #endif
-    }else{
+    } else {
         memcpy(fp->write_cur, s, len);
         fp->write_cur += len;
         // fp->fsize += len;
@@ -1053,15 +1058,15 @@ int __accmut__fputs(const char* s, ACCMUT_FILE *fp){
     return result;
 }
 
-int __accmut__puts(const char* s){
+int __accmut__puts(const char *s) {
     CALLLOG(accmut_stdout);
     int result = EOF;
     size_t len = strlen(s);
-    if( (accmut_stdout->write_cur + len + 1) >= accmut_stdout->bufend){
+    if ((accmut_stdout->write_cur + len + 1) >= accmut_stdout->bufend) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "STDOUT OVERFLOW @ __accmut__puts, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
 #endif
-    }else{
+    } else {
         memcpy(accmut_stdout->write_cur, s, len);
         accmut_stdout->write_cur += len;
         *accmut_stdout->write_cur = '\n';
@@ -1092,10 +1097,10 @@ int __accmut__puts(const char* s){
 // 	return 0;
 // }
 
-int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
+int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...) {
     CALLLOG(fp);
 
-    if(fp == NULL){
+    if (fp == NULL) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "NULL ACCMUT FILE  !!! @__accmut__fprintf, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
 #endif
@@ -1105,11 +1110,11 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
     int ret;
     va_list ap;
     va_start(ap, format);
-    ret = vsprintf(fp->write_cur, format, ap);	//TODO:: use (STDOUT_BUFF + CUR_STDOUT) instead of tmp
+    ret = vsprintf(fp->write_cur, format, ap);    //TODO:: use (STDOUT_BUFF + CUR_STDOUT) instead of tmp
     va_end(ap);
 
     int max;
-    switch(fp->fd){
+    switch (fp->fd) {
         case 0:
             max = 0;
             break;
@@ -1124,7 +1129,7 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
             break;
     }
 
-    if((fp->write_cur - fp->bufbase) + ret  > max){
+    if ((fp->write_cur - fp->bufbase) + ret > max) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "ACCMUT BUFFER OVERFLOW !  @__accmut__fprintf. TID:%d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -1132,7 +1137,7 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
     }
     // ERRMSG("???");
     if (MUTATION_ID == 0) {
-    // ERRMSG("???1");
+        // ERRMSG("???1");
         va_start(ap, format);
         if (ret != vfprintf(fp->orifile, format, ap)) {
             ERRMSG("\033[31mNo sync with stdio\033[0m");
@@ -1147,15 +1152,15 @@ int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...){
     return ret;
 }
 
-int __accmut__printf(const char *format, ...){
+int __accmut__printf(const char *format, ...) {
     CALLLOG(accmut_stdout);
     int ret;
     va_list ap;
     va_start(ap, format);
-    ret = vsprintf(accmut_stdout->write_cur, format, ap);	//TODO:: use (STDOUT_BUFF + CUR_STDOUT) instead of tmp
+    ret = vsprintf(accmut_stdout->write_cur, format, ap);    //TODO:: use (STDOUT_BUFF + CUR_STDOUT) instead of tmp
     va_end(ap);
 
-    if((accmut_stdout->write_cur - accmut_stdout->bufbase) + ret  > MAX_STDOUT_BUF_SIZE){
+    if ((accmut_stdout->write_cur - accmut_stdout->bufbase) + ret > MAX_STDOUT_BUF_SIZE) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "ACCMUT STDOUT BUF OVERFLOW !  @__accmut__printf, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
 #endif
@@ -1176,10 +1181,10 @@ int __accmut__printf(const char *format, ...){
     return ret;
 }
 
-size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE *fp){
+size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE *fp) {
     CALLLOG(fp);
-    size_t request = size*count;
-    if(fp->write_cur + request > fp->bufend){
+    size_t request = size * count;
+    if (fp->write_cur + request > fp->bufend) {
 #if ACCMUT_IO_DEBUG
         fprintf(stderr, "ACCMUT WRITE OVERFLOW !  @__accmut__fwrite, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
 #endif
@@ -1251,7 +1256,7 @@ void __accmut__oracal_bufinit(){
 }*/
 
 
-void __accmut__setout(int id){
+void __accmut__setout(int id) {
     char path[120];
     strcpy(path, getenv("HOME"));
     strcat(path, "/tmp/accmut/output/");
@@ -1259,10 +1264,11 @@ void __accmut__setout(int id){
     strcat(path, "/t");
     sprintf(path, "%s%d_%d", path, TEST_ID, id);
     //printf("PATH : %s\n", path);
-    if (freopen(path, "w", stdout)==NULL){
+    if (freopen(path, "w", stdout) == NULL) {
         fprintf(stderr, "STDOUT REDIR ERR! : %s\n", path);
     }
 }
+
 /*
 void __accmut__oracledump(){
     fprintf(stderr, "\n********** TID:%d  ORI BUFFER SIZE: %d ***********\n", TEST_ID, ORACLESIZE);
@@ -1301,12 +1307,12 @@ void __accmut__filedump(ACCMUT_FILE *fp){
 		TEST_ID, MUTATION_ID, fp->fd);
 }*/
 
-void __accmut__perror(const char *s){
+void __accmut__perror(const char *s) {
     CALLLOG();
     __accmut__fprintf(accmut_stderr, "%s\n", s);
 }
 
-int __accmut__fflush(ACCMUT_FILE *stream){
+int __accmut__fflush(ACCMUT_FILE *stream) {
     CALLLOG(stream);
     //all in memory, do not need flush
     return 0;

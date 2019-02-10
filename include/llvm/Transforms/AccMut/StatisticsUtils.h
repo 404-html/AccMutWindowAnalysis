@@ -1,8 +1,8 @@
 //===----------------------------------------------------------------------===//
 //
- // This file include some utils for statistic
+// This file include some utils for statistic
 // 
- // Add by Wang Bo. April 1, 2016
+// Add by Wang Bo. April 1, 2016
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,16 +27,20 @@
 using namespace llvm;
 using namespace std;
 
-class ExecInstNums: public FunctionPass{
+class ExecInstNums : public FunctionPass {
 public:
-	static char ID;// Pass identification, replacement for typeid
-	static map<StringRef, int> funcNameID;
+    static char ID;// Pass identification, replacement for typeid
+    static map<StringRef, int> funcNameID;
     static int curID;
-	virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-	virtual bool runOnFunction(Function &F);
-	ExecInstNums(/*Module *M*/);
+
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const;
+
+    virtual bool runOnFunction(Function &F);
+
+    ExecInstNums(/*Module *M*/);
+
 private:
-	Module *TheModule;
+    Module *TheModule;
 };
 
 

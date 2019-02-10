@@ -25,8 +25,7 @@ extern int pnum;
 
 extern char *OUTPUT_FILE;
 
-int32_t goodvar_fork(int mutID)
-{
+int32_t goodvar_fork(int mutID) {
 #if 1
 
     if (OUTPUT_FILE == NULL) {
@@ -47,38 +46,35 @@ int32_t goodvar_fork(int mutID)
 
     pid_t pid = fork();
 
-    if(pid < 0){
+    if (pid < 0) {
         ERRMSG("fork FAILED ");
         exit(ENV_ERR);
     }
 
-    if(pid == 0)
-    {
+    if (pid == 0) {
         int r1 = setitimer(ITIMER_REAL, &ACCMUT_REAL_TICK, NULL);
         int r2 = setitimer(ITIMER_PROF, &ACCMUT_PROF_TICK, NULL);
 
-        if(r1 < 0 || r2 < 0){
+        if (r1 < 0 || r2 < 0) {
             ERRMSG("setitimer ERR ");
             exit(ENV_ERR);
         }
 
-        if (mprotect((void *)(&MUTATION_ID), PAGESIZE, PROT_READ | PROT_WRITE)) {
+        if (mprotect((void *) (&MUTATION_ID), PAGESIZE, PROT_READ | PROT_WRITE)) {
             perror("mprotect ERR : PROT_READ | PROT_WRITE");
             exit(ENV_ERR);
         }
 
         MUTATION_ID = mutID;
 
-        if (mprotect((void *)(&MUTATION_ID), PAGESIZE, PROT_READ)) {
+        if (mprotect((void *) (&MUTATION_ID), PAGESIZE, PROT_READ)) {
             perror("mprotect ERR : PROT_READ");
             exit(ENV_ERR);
         }
 
         // isChild = true
         return 1;
-    }
-    else
-    {
+    } else {
         int pr = waitpid(pid, NULL, 0);
 
         struct itimerval MAIN_REAL_TICK, MAIN_PROF_TICK;
@@ -91,7 +87,7 @@ int32_t goodvar_fork(int mutID)
         //int r2 =
         setitimer(ITIMER_PROF, &MAIN_PROF_TICK, NULL);
 
-        if(pr < 0){
+        if (pr < 0) {
             ERRMSG("waitpid ERR ");
             exit(ENV_ERR);
         }
