@@ -2,6 +2,7 @@
 # CMakeLists.txt
 
 add_subdirectory(AccMutRuntime)
+add_subdirectory(AccMutRuntimeV2)
 add_subdirectory(IR)
 add_subdirectory(FuzzMutate)
 add_subdirectory(IRReader)
