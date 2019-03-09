@@ -8,6 +8,7 @@
 
 #include "llvm/AccMutRuntime/accmut_config.h"
 #include "llvm/AccMutRuntime/accmut_io.h"
+#include "llvm/AccMutRuntime/accmut_io_cleanup.h"
 
 /*************************************************/
 
@@ -54,16 +55,56 @@ int __real_fprintf(FILE *fp, const char *format, ...) {
 #define NOCALLLOG
 
 #ifndef NOCALLLOG
-
+/*
+ 
+  if (1 || MUTATION_ID == 0) {    \
+  if ((fp)->orifile) {\
+  ftell((fp)->orifile);\
+  lseek(fileno((fp)->orifile), 0L, SEEK_CUR);\
+  }\
+  }
+*/
 #define _CALLLOG(dummy, fp, ...) \
-    if (MUTATION_ID == 0) {\
-        __real_fprintf(stderr, "pid: %d\n", getpid());\
+  if (MUTATION_ID != 0) {                          \
+  /*__real_fprintf(stderr, "pid: %d\n", getpid()); */   \
         if ((fp) != NULL) {\
-            __real_fprintf(stderr, "\033[32mCalling %s on %s\n\033[0m", __FUNCTION__, (fp)->filename);\
+        /*__real_fprintf(stderr, "\033[32mCalling %s on %s\n\033[0m", __FUNCTION__, (fp)->filename); */ \
+        /*   if ((fp)->read_cur) {                               */     \
+        /*    __real_fprintf(stderr, "Buf: ");                   */     \
+        /*    for (int i = 0; i < 20; ++i) {                     */     \
+        /*        if ((fp)->read_cur[i] == 0)                    */     \
+        /*            break;                                     */     \
+        /*        if ((fp)->read_cur[i] == '\n')                 */     \
+        /*            __real_fprintf(stderr, "\\n");             */     \
+        /*        else                                           */     \
+        /*            __real_fprintf(stderr, "%c", (fp)->read_cur[i]);*/ \
+          /*    }                                                     */ \
+          /*}*/                                                         \
+            if ((fp)->orifile && (fp)->orifile->_IO_read_ptr) { \
+                /* perror("ftell");  */                            \
+              /*long pos = ftell((fp)->orifile);   */                   \
+                /*if (pos < 0) perror("ftell");                */       \
+                  /*__real_fprintf(stderr, "\nInt pos: %ld, ", pos);  */ \
+              /*long l = lseek(fileno((fp)->orifile), 0L, SEEK_CUR); */ \
+              /*__real_fprintf(stderr, "%ld, %d\n", l, MUTATION_ID);*/  \
+              /*__real_fprintf(stderr, "%d, %ld\n", fileno((fp)->orifile), lseek(fileno((fp)->orifile), 0L, SEEK_CUR)); */ \
+              /*__real_fprintf(stderr, "a\n"); */                       \
+                /*__real_fprintf(stderr, "Int: ");  */                  \
+                /*for (int i = 0; i < 20; ++i) {  */                    \
+                /*    if ((fp)->orifile->_IO_read_ptr[i] == 0)    */    \
+                /*        break;                              */        \
+                /* if ((fp)->orifile->_IO_read_ptr[i] == '\n')*/        \
+                /*__real_fprintf(stderr, "\\n");          */            \
+                /*else                                */                \
+                /*__real_fprintf(stderr, "%c", (fp)->orifile->_IO_read_ptr[i]); */ \
+                /*}*/                                                   \
+            }\
+            /*fprintf(stderr, "\n");*/          \
         } else {\
             __real_fprintf(stderr, "\033[32mCalling %s\n\033[0m", __FUNCTION__);\
         }\
     }
+  
 
 #define CALLLOG(...) _CALLLOG(0, ##__VA_ARGS__, (ACCMUT_FILE*)(NULL))
 
@@ -73,6 +114,7 @@ int __real_fprintf(FILE *fp, const char *format, ...) {
 
 #endif
 
+static ACCMUT_FILE *__opened_file_list[1000];
 
 /*********************** FILE OPTIONS ****************************************/
 
@@ -208,17 +250,24 @@ ACCMUT_FILE *__accmut__fopen(const char *path, const char *mode) {
         }
     }
 
+    // for cleanup
+
+    __accmut__io__register(fp);
+
     return fp;
 }
 
 
 int __accmut__fclose(ACCMUT_FILE *fp) {
     CALLLOG(fp);
+    __accmut__io__deregister(fp);
     //if (fp->filename)
     //    free(fp->filename);
     int status = 0;
     if (fp->usetmp) {
-        return fclose(fp->orifile);
+        if (fp->orifile)
+            return fclose(fp->orifile);
+        return 0;
     }
     if (fp->orifile) {
         status = fclose(fp->orifile);
@@ -372,19 +421,23 @@ char *__accmut__fgets(char *buf, int size, ACCMUT_FILE *fp) {
 
     if (MUTATION_ID == 0) {
         char intenalbuf[size + 1];
-        //ERRMSG(fp->orifile->_IO_read_ptr);
         int before = 0, after = 0;
-        // ERRMSG("\033[33mBegin dump content\n\033[0m");
 
-        // ERRMSG2("base", (int)(fp->orifile->_IO_read_base));
-        // ERRMSG2("ptr", (int)(fp->orifile->_IO_read_ptr));
-        // ERRMSG("\033[32mBegin dump\n\033[0m");
-        /* if (fp->orifile->_IO_read_base)
-            ERRMSG2("len of base before", (int)strlen(fp->orifile->_IO_read_base));
-        if (fp->orifile->_IO_read_ptr)
-            ERRMSG2("len of cur before", (before = (int)strlen(fp->orifile->_IO_read_ptr)));
+        /*
+            ERRMSG(fp->orifile->_IO_read_ptr);
+            ERRMSG("\033[33mBegin dump content\n\033[0m");
+
+            ERRMSG2("base", (int)(fp->orifile->_IO_read_base));
+            ERRMSG2("ptr", (int)(fp->orifile->_IO_read_ptr));
+            ERRMSG("\033[32mBegin dump\n\033[0m");
+            if (fp->orifile->_IO_read_base)
+                ERRMSG2("len of base before", (int)strlen(fp->orifile->_IO_read_base));
+            if (fp->orifile->_IO_read_ptr)
+                ERRMSG2("len of cur before", (before = (int)strlen(fp->orifile->_IO_read_ptr)));
         */
+        
         fgets(intenalbuf, size, fp->orifile);
+
         /*
         if (fp->orifile->_IO_read_base)
             ERRMSG2("len of base after", (int)strlen(fp->orifile->_IO_read_base));
@@ -394,11 +447,12 @@ char *__accmut__fgets(char *buf, int size, ACCMUT_FILE *fp) {
 
         ERRMSG2("base", (int)(fp->orifile->_IO_read_base));
         ERRMSG2("ptr", (int)(fp->orifile->_IO_read_ptr));
-        //ERRMSG("\033[32m");
-        //ERRMSG("\033[0m");
+        ERRMSG("\033[32m");
+        ERRMSG("\033[0m");
         ERRMSG(buf);
         ERRMSG(intenalbuf);
-        */
+	*/
+        
         if (strcmp(buf, intenalbuf) != 0) {
             // panic
             ERRMSG("\033[31mNo sync with stdio\033[0m");
@@ -430,6 +484,19 @@ int __accmut__getc(ACCMUT_FILE *fp) {
     }
 
     return ret;
+}
+
+static int __accmut__getc__nosync(ACCMUT_FILE *fp) {
+    CALLLOG(fp);
+    if (fp->read_cur - fp->bufbase >= fp->fsize) {
+#if ACCMUT_IO_DEBUG
+        fprintf(stderr, "READ OVERFLOW @ __accmut__getc, TID: %d, MUT: %d, fd: %d\n", TEST_ID, MUTATION_ID, fp->fd);
+#endif
+        fp->flags |= _IO_EOF_SEEN;
+        return EOF;
+    }
+
+    return *((unsigned char *) fp->read_cur++);
 }
 
 int __accmut__fgetc(ACCMUT_FILE *fp) {
@@ -530,6 +597,33 @@ int __accmut__ungetc(int c, ACCMUT_FILE *fp) {
     return res;
 }
 
+int __accmut__ungetc__nosync(int c, ACCMUT_FILE *fp) {
+    CALLLOG(fp);
+
+    if (c == EOF)
+        return EOF;
+
+    if (fp->flags != O_RDONLY) {
+#if ACCMUT_IO_DEBUG
+        fprintf(stderr, "UNGETC OF NON-READABLE-FILE @ __accmut__ungetc, TID: %d, MUT: %d\n", TEST_ID, MUTATION_ID);
+#endif
+        return EOF;
+    }
+
+    int res;
+    if (fp->read_cur > fp->bufbase
+        && (unsigned char) fp->read_cur[-1] == (unsigned char) c) {
+        (fp->read_cur)--;
+        res = (unsigned char) c;
+    } else
+        res = EOF;
+
+    if (res != EOF)
+        fp->flags &= ~_IO_EOF_SEEN;
+
+    return res;
+}
+
 /********************INNER DENINES AND FUNCTIONS FOR SCANF ***************************/
 #define FL_LJUST    0x0001      /* left-justify field */
 #define FL_SIGN     0x0002      /* sign in signed conversions */
@@ -578,19 +672,19 @@ static char *__accmut__o_collect(register int c, register ACCMUT_FILE *stream, c
     if (c == '-' || c == '+') {
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
     }
 
     if (width && c == '0' && base == 16) {
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
         if (c != 'x' && c != 'X') {
             if (type == 'i') base = 8;
         } else if (width) {
             *bufp++ = c;
             if (--width)
-                c = __accmut__getc(stream);
+                c = __accmut__getc__nosync(stream);
         }
     } else if (type == 'i') base = 10;
 
@@ -601,11 +695,11 @@ static char *__accmut__o_collect(register int c, register ACCMUT_FILE *stream, c
             || ((base == 2) && isdigit(c) && (c < '2'))) {
             *bufp++ = c;
             if (--width)
-                c = __accmut__getc(stream);
+                c = __accmut__getc__nosync(stream);
         } else break;
     }
 
-    if (width && c != EOF) __accmut__ungetc(c, stream);
+    if (width && c != EOF) __accmut__ungetc__nosync(c, stream);
     if (type == 'i') base = 0;
     *basep = base;
     *bufp = '\0';
@@ -630,54 +724,54 @@ static char *__accmut__f_collect(register int c, register ACCMUT_FILE *stream, r
     if (c == '-' || c == '+') {
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
     }
 
     while (width && isdigit(c)) {
         digit_seen++;
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
     }
     if (width && c == '.') {
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
         while (width && isdigit(c)) {
             digit_seen++;
             *bufp++ = c;
             if (--width)
-                c = __accmut__getc(stream);
+                c = __accmut__getc__nosync(stream);
         }
     }
 
     if (!digit_seen) {
-        if (width && c != EOF) __accmut__ungetc(c, stream);
+        if (width && c != EOF) __accmut__ungetc__nosync(c, stream);
         return inp_buf - 1;
     } else digit_seen = 0;
 
     if (width && (c == 'e' || c == 'E')) {
         *bufp++ = c;
         if (--width)
-            c = __accmut__getc(stream);
+            c = __accmut__getc__nosync(stream);
         if (width && (c == '+' || c == '-')) {
             *bufp++ = c;
             if (--width)
-                c = __accmut__getc(stream);
+                c = __accmut__getc__nosync(stream);
         }
         while (width && isdigit(c)) {
             digit_seen++;
             *bufp++ = c;
             if (--width)
-                c = __accmut__getc(stream);
+                c = __accmut__getc__nosync(stream);
         }
         if (!digit_seen) {
-            if (width && c != EOF) __accmut__ungetc(c, stream);
+            if (width && c != EOF) __accmut__ungetc__nosync(c, stream);
             return inp_buf - 1;
         }
     }
 
-    if (width && c != EOF) __accmut__ungetc(c, stream);
+    if (width && c != EOF) __accmut__ungetc__nosync(c, stream);
     *bufp = '\0';
     return bufp - 1;
 }
@@ -707,26 +801,26 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
         if (isspace(*format)) {
             while (isspace(*format))
                 format++;    /* skip whitespace */
-            ic = __accmut__getc(stream);
+            ic = __accmut__getc__nosync(stream);
             nrchars++;
             while (isspace (ic)) {
-                ic = __accmut__getc(stream);
+                ic = __accmut__getc__nosync(stream);
                 nrchars++;
             }
-            if (ic != EOF) __accmut__ungetc(ic, stream);
+            if (ic != EOF) __accmut__ungetc__nosync(ic, stream);
             nrchars--;
         }
         if (!*format) break;    /* end of format */
 
         if (*format != '%') {
-            ic = __accmut__getc(stream);
+            ic = __accmut__getc__nosync(stream);
             nrchars++;
             if (ic != *format++) break;    /* error */
             continue;
         }
         format++;
         if (*format == '%') {
-            ic = __accmut__getc(stream);
+            ic = __accmut__getc__nosync(stream);
             nrchars++;
             if (ic == '%') {
                 format++;
@@ -761,12 +855,12 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
         kind = *format;
         if ((kind != 'c') && (kind != '[') && (kind != 'n')) {
             do {
-                ic = __accmut__getc(stream);
+                ic = __accmut__getc__nosync(stream);
                 nrchars++;
             } while (isspace(ic));
             if (ic == EOF) break;        /* outer while */
         } else if (kind != 'n') {        /* %c or %[ */
-            ic = __accmut__getc(stream);
+            ic = __accmut__getc__nosync(stream);
             if (ic == EOF) break;        /* outer while */
             nrchars++;
         }
@@ -836,13 +930,13 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                     if (!(flags & FL_NOASSIGN))
                         *str++ = (char) ic;
                     if (--width) {
-                        ic = __accmut__getc(stream);
+                        ic = __accmut__getc__nosync(stream);
                         nrchars++;
                     }
                 }
 
                 if (width) {
-                    if (ic != EOF) __accmut__ungetc(ic, stream);
+                    if (ic != EOF) __accmut__ungetc__nosync(ic, stream);
                     nrchars--;
                 }
                 break;
@@ -857,7 +951,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                     if (!(flags & FL_NOASSIGN))
                         *str++ = (char) ic;
                     if (--width) {
-                        ic = __accmut__getc(stream);
+                        ic = __accmut__getc__nosync(stream);
                         nrchars++;
                     }
                 }
@@ -865,7 +959,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                 if (!(flags & FL_NOASSIGN))
                     *str = '\0';
                 if (width) {
-                    if (ic != EOF) __accmut__ungetc(ic, stream);
+                    if (ic != EOF) __accmut__ungetc__nosync(ic, stream);
                     nrchars--;
                 }
                 break;
@@ -904,7 +998,7 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
 
                 if (!(Xtable[ic] ^ reverse)) {
                     /* MAT 8/9/96 no match must return character */
-                    __accmut__ungetc(ic, stream);
+                    __accmut__ungetc__nosync(ic, stream);
                     return done;
                 }
 
@@ -915,13 +1009,13 @@ static int __accmut___doscan(register ACCMUT_FILE *stream, const char *format, v
                     if (!(flags & FL_NOASSIGN))
                         *str++ = (char) ic;
                     if (--width) {
-                        ic = __accmut__getc(stream);
+                        ic = __accmut__getc__nosync(stream);
                         nrchars++;
                     }
                 } while (width && ic != EOF && (Xtable[ic] ^ reverse));
 
                 if (width) {
-                    if (ic != EOF) __accmut__ungetc(ic, stream);
+                    if (ic != EOF) __accmut__ungetc__nosync(ic, stream);
                     nrchars--;
                 }
                 if (!(flags & FL_NOASSIGN)) {    /* terminate string */
@@ -994,11 +1088,13 @@ int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...) {
     retval = __accmut___doscan(fp, format, ap);
 
     va_end(ap);
+    CALLLOG(fp);
 
     if (MUTATION_ID == 0) {
         va_start(ap, format);
         int r = vfscanf(fp->orifile, format, ap);
         va_end(ap);
+        CALLLOG(fp);
         if (r != retval) {
             ERRMSG("\033[31mNo sync with stdio\033[0m");
             exit(EXIT_FAILURE);

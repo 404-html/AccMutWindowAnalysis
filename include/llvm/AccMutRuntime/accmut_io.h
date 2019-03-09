@@ -14,6 +14,7 @@ typedef struct _ACCMUT_FILE {
     FILE *orifile;
     int usetmp;
     char *filename;
+    int isopen;
 } ACCMUT_FILE;
 
 extern ACCMUT_FILE *accmut_stdin;

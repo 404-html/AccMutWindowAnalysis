@@ -6,6 +6,7 @@ add_llvm_library(AccMutRuntime
         accmut_GoodVar.cpp
         accmut_GoodVar_fork.c
         accmut_io.c
+        accmut_io_cleanup.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/AccMutRuntime

@@ -10,6 +10,7 @@
 #include "llvm/AccMutRuntime/accmut_process.h"
 #include "llvm/AccMutRuntime/accmut_arith_common.h"
 #include "llvm/AccMutRuntime/accmut_io.h"
+#include "llvm/AccMutRuntime/accmut_io_cleanup.h"
 #include "llvm/AccMutRuntime/accmut_exitcode.h"
 
 
@@ -245,7 +246,7 @@ void __accmut__filter__mutants(int from, int to, int classid) {
 }
 
 int pnum = 1;
-char *OUTPUT_FILE = NULL;
+char *OUTPUT_FILE = "WAOUTPUT.txt";
 
 long __accmut__fork__eqclass(int from, int to) {
 
@@ -315,6 +316,8 @@ long __accmut__fork__eqclass(int from, int to) {
 #if 0
             fprintf(stderr, "%d %d\n", TEST_ID, MUTATION_ID);
 #endif
+
+            __accmut__io__close__ori();
 
             return eqclass[i].value;
         } else {
