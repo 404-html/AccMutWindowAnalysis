@@ -9,6 +9,9 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
+
 using namespace llvm;
 
 
@@ -178,6 +181,8 @@ bool WAInstrumenter::runOnFunction(Function &F) {
     }
 
     errs() << "\n######## WA INSTRUMTNTING MUT @ " << F.getName() << "()  ########\n\n";
+
+    collectCanMove(F, v);
 
     getInstMutsMap(v, F);
 
@@ -411,6 +416,150 @@ static bool pushPreparecallParam(std::vector<Value *> &params, int index, Value 
     return true;
 }
 
+static StoreInst *mayAlias(AliasAnalysis *AA, LoadInst *ld, StoreInst *st) {
+    auto loc = MemoryLocation::get(ld);
+    auto info = AA->getModRefInfo(st, loc);
+    if (isNoModRef(info)) {
+        return nullptr;
+    }
+    return st;
+}
+
+static StoreInst *mayAliasBetween(AliasAnalysis *AA, LoadInst *ld, CallInst *call) {
+    assert(ld->getParent() == call->getParent());
+    auto i = ld->getNextNode();
+    llvm::errs() << "ld inst" << *ld << "\n";
+    while (i != call) {
+        if (StoreInst *st = dyn_cast<StoreInst>(i)) {
+            llvm::errs() << "store inst" << *st << "\n";
+            if (mayAlias(AA, ld, st)) {
+                llvm::errs() << "may alias" << *st << "\n";
+                return st;
+            }
+        }
+        i = i->getNextNode();
+    }
+    return nullptr;
+}
+
+BasicBlock::iterator WAInstrumenter::getLocation(Function &F, int instrumented_insts, int index) {
+    int cur = 0;
+    for (Function::iterator FI = F.begin(); FI != F.end(); ++FI) {
+        Function::iterator BB = FI;
+        for (BasicBlock::iterator BI = BB->begin(); BI != BB->end(); ++BI, cur++) {
+            if (index + instrumented_insts == cur) {
+                return BI;
+            }
+        }
+    }
+    return F.back().end();
+}
+
+void WAInstrumenter::collectCanMove(Function &F, vector<Mutation *> *v) {
+    canMove.clear();
+    std::unordered_map<Value *, int> numDirectUse;
+    // auto &t = getAnalysis<MemoryDependenceWrapperPass>();
+    AliasAnalysis *AA = &getAnalysis<AAResultsWrapperPass>(F).getAAResults();
+    // If more users exists, don't move
+    for (auto i = F.begin(); i != F.end(); ++i) {
+        for (auto j = i->begin(); j != i->end(); ++j) {
+            for (auto x = j->op_begin(); x != j->op_end(); ++x) {
+                numDirectUse[(x->get())]++;
+            }
+        }
+    }
+    for (unsigned i = 0; i < v->size(); ++i) {
+        int cur_index = (*v)[i]->index;
+        for (unsigned j = i + 1; j < v->size(); ++j) {
+            if ((*v)[j]->index == cur_index) {
+                i = j;
+            } else {
+                break;
+            }
+        }
+        auto cur_it = getLocation(F, 0, cur_index);
+        if (CallInst *inst = dyn_cast<CallInst>(&*cur_it)) {
+            for (auto i = inst->op_begin(); i != inst->op_end(); ++i) {
+                auto t = i->get()->getType();
+                if (t->isIntegerTy(32) || t->isIntegerTy(64)) {
+                    if (LoadInst *ld = dyn_cast<LoadInst>(&*(i->get()))) {
+                        if (numDirectUse[&*ld] != 1) {
+                            llvm::errs() << "No\t" << *ld << "\n";
+                            canMove[&*ld] = false;
+                            continue;
+                        } else {
+                            // only consider basic block local ops, perhaps all ops are basic block local since we perform no optimize
+                            if (ld->getParent() != inst->getParent()) {
+                                llvm::errs() << "Not BB\t" << *ld << "\n";
+                                canMove[&*ld] = false;
+                                continue;
+                            }
+                            if (StoreInst *st = mayAliasBetween(AA, ld, inst)) {
+                                llvm::errs() << "May alias\t" << *ld << "\n" << "With\t" << *st << "\n";
+                                canMove[&*ld] = false;
+                                continue;
+                            }
+                            llvm::errs() << "Yes\t" << *ld << "\n";
+                            canMove[&*ld] = true;
+                            continue;
+                        }
+                    }
+                } else {
+                    //assert(false);
+                }
+            }
+        }
+    }
+
+    /*
+    for (auto i = F.begin(); i != F.end(); ++i) {
+      for (auto j = i->begin(); j != i->end(); ++j) {
+        if (isa<LoadInst>(&*j) ||
+            isa<Constant>(&*j) ||
+            isa<GetElementPtrInst>(*&*j)) {
+          if (numDirectUse[&*j] != 1) {
+            goto no;
+          }
+          goto yes;
+        } else if (isa<Operator>(&*j)) {
+          llvm::errs() << "operator\n";
+          goto noneed;
+        } else {
+          llvm::errs() << "instruction\n";
+          Instruction *coversion = dyn_cast<Instruction>(&*j);
+          if (isHandledCoveInst(coversion)) {
+            Instruction* op_of_cov = dyn_cast<Instruction>(coversion->getOperand(0));
+            if(isa<LoadInst>(&*op_of_cov) || isa<AllocaInst>(&*op_of_cov)){
+              if (numDirectUse[&*j] != 1 || numDirectUse[&*op_of_cov] != 1) {
+                goto no;
+              } else {
+                goto yes;
+              }
+            } else {
+              llvm::errs() << "noneed inst\n";
+              goto noneed;
+            }
+          } else {
+            goto noneed;
+          }
+        }
+
+      noneed:
+        llvm::errs() << "No need\t" << *j << "\n";
+        continue;
+      no:
+        llvm::errs() << "No\t" << *j << "\n";
+        canMove[&*j] = false;
+        continue;
+      yes:
+        llvm::errs() << "Yes\t" << *j << "\n";
+        canMove[&*j] = true;
+        continue;
+      }
+      }*/
+}
+
+
 void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable) {
     // TODO: test without it first
 
@@ -451,6 +600,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable) {
                 AllocaInst *alloca = new AllocaInst(type, 0, (V->getName().str() + ".alias"), &*cur_it);
                 /*StoreInst *str = */new StoreInst(V, alloca, &*cur_it);
                 LoadInst *ld = new LoadInst(alloca, (V->getName().str() + ".ld"), &*cur_it);
+                canMove[&*ld] = true;
                 *OI = (Value *) ld;
                 instrumented_insts += 3;//add 'alloca', 'store' and 'load'
             }/*
@@ -551,6 +701,7 @@ void WAInstrumenter::instrumentAsDMA(Instruction &I, bool aboutGoodVariable) {
                 llvm::errs() << *it << "'th\t";
             }
             llvm::errs() << "\n";
+            llvm::errs() << *cur_it << "\n";
         }
 
         //insert num of param-records
@@ -1236,6 +1387,40 @@ void WAInstrumenter::getGoodVariables(BasicBlock &BB) {
             goodVariables[&*I] = ++goodVariableCount;
         }
     }
+
+    bool nb = false;
+
+    if (goodVariableCount >= 15) {
+        llvm::errs() << "TOO MANY\n";
+        goodVariables.clear();
+        return;
+    }
+    //errs() << "GV: " << goodVariableCount << "\n";
+
+    /*
+    for (auto it = BB.rbegin(), end = BB.rend(); it != end;) {
+      //errs() << it.getNodePtr() << "---" << it->getPrevNode() << "\n";
+      //errs() << "\n---F---" << *BB.getParent() << "---F---\n";
+
+      // avoid iterator invalidation
+      Instruction &I = *it;
+      ++it;
+
+      if (goodVariables.count(&I) == 1 || hasUsedPreviousGoodVariables(&I)) {
+        if (isSupportedBoolInstruction(&I)) {
+          if (nb == false)
+            llvm::errs() << "BOOL\n";
+          else
+            llvm::errs() << "NOT LAST\n";
+          return;
+        } else {
+          nb = false;
+        }
+      }
+    }
+
+    llvm::errs() << "NONE\n";
+    goodVariables.clear();*/
 }
 
 
@@ -1320,6 +1505,10 @@ bool WAInstrumenter::hasUsedPreviousGoodVariables(Instruction *I) {
     return false;
 }
 
+void WAInstrumenter::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+    AU.addRequired<AAResultsWrapperPass>();
+    AU.addRequired<MemoryDependenceWrapperPass>();
+}
 
 char WAInstrumenter::ID = 0;
 static RegisterPass<WAInstrumenter> X("AccMut-window", "AccMut - Instrument Code with Window Mechanism");

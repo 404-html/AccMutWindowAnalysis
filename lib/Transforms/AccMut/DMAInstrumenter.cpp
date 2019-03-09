@@ -877,14 +877,9 @@ void DMAInstrumenter::instrument(Function &F, vector<Mutation *> *v) {
             //move the loadinsts of params into if_then_block
             index = 0;
             for (auto OI = oricall->op_begin(), OE = oricall->op_end() - 1; OI != OE; ++OI, ++index) {
-                continue;
 
                 //only move pushed parameters
                 if (find(pushed_param_idx.begin(), pushed_param_idx.end(), index) == pushed_param_idx.end()) {
-                    continue;
-                }
-                if (Argument *arg = dyn_cast<Argument>(&*OI)) {
-                    llvm::errs() << "Can't move arguments: " << *(OI->get()) << "\n";
                     continue;
                 }
                 if (canMove.find(OI->get()) == canMove.end()) {

@@ -23,6 +23,7 @@ using namespace llvm;
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 
 using std::vector;
 using std::map;
@@ -33,6 +34,7 @@ class WAInstrumenter : public ModulePass {
 public:
 
     static char ID;// Pass identification, replacement for typeid
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const;
 
     WAInstrumenter();
 
@@ -44,6 +46,7 @@ private:
     bool firstTime = true;
     GlobalVariable *rmigv;
     StructType *regmutinfo;
+    std::unordered_map<Value *, bool> canMove;
 
     bool runOnFunction(Function &F);
 
@@ -54,6 +57,10 @@ private:
     Function *goodVarI64ArithFunc;
     Function *goodVarI32CmpFunc;
     Function *goodVarI64CmpFunc;
+
+    BasicBlock::iterator getLocation(Function &F, int instrumented_insts, int index);
+
+    void collectCanMove(Function &F, vector<Mutation *> *v);
 
     void setGoodVarFunc();
 
