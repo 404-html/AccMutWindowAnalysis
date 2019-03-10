@@ -139,5 +139,7 @@ void __accmut__debug(int index);
 
 void __accmut__load_all_muts();
 
+void __accmut__init();
+
 
 #endif

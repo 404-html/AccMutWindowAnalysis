@@ -1,68 +1,50 @@
-#ifndef ACCMUT_IO_H
-#define ACCMUT_IO_H
+//
+// Created by lusirui on 19-3-10.
+//
 
-#include <stddef.h>
+#ifndef LLVM_ACCMUT_IO_H
+#define LLVM_ACCMUT_IO_H
 
-typedef struct _ACCMUT_FILE {
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int __accmutv2__open(const char *pathname, int flags, ...);
+int __accmutv2__creat(const char *pathname, mode_t mode);
+int __accmutv2__close(int fd);
+ssize_t __accmutv2__lseek(int fd, off_t offset, int whence);
+ssize_t __accmutv2__read(int fd, void *buf, size_t count);
+ssize_t __accmutv2__write(int fd, const void *buf, size_t count);
+void __accmutv2__checkfd_func();
+void __accmutv2__dump__text(int fd);
+void __accmutv2__dump__bin(int fd);
+
+typedef struct ACCMUTV2_FILE {
     int flags;
     int fd;
-    char *bufbase;
-    char *bufend;
-    char *read_cur;
-    char *write_cur;
-    int fsize;    //only for input file
     FILE *orifile;
-    int usetmp;
-    char *filename;
-    int isopen;
-} ACCMUT_FILE;
+} ACCMUTV2_FILE;
 
-extern ACCMUT_FILE *accmut_stdin;
-extern ACCMUT_FILE *accmut_stdout;
-extern ACCMUT_FILE *accmut_stderr;
+extern ACCMUTV2_FILE *accmutv2_stdin;
+extern ACCMUTV2_FILE *accmutv2_stdout;
+extern ACCMUTV2_FILE *accmutv2_stderr;
 
-ACCMUT_FILE *__accmut__fopen(const char *path, const char *mode);
+ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode);
+int __accmutv2__fclose(ACCMUTV2_FILE *fp);
+int __accmutv2__feof(ACCMUTV2_FILE *fp);
+int __accmutv2__fileno(ACCMUTV2_FILE *fp);
+ACCMUTV2_FILE *__accmut__fgets(char *buf, int size, ACCMUTV2_FILE *fp);
+size_t __accmut__puts(char *buf, int size, ACCMUTV2_FILE *fp);
 
-int __accmut__fclose(ACCMUT_FILE *fp);
-
-int __accmut__feof(ACCMUT_FILE *fp);
-
-int __accmut__fileno(ACCMUT_FILE *fp);
-
-ACCMUT_FILE *__accmut__freopen(const char *path, const char *mode, ACCMUT_FILE *fp);
-
-int __accmut__unlink(const char *pathname);
-
-
-char *__accmut__fgets(char *buf, int size, ACCMUT_FILE *fp);
-
-int __accmut__getc(ACCMUT_FILE *fp);
-
-int __accmut__fgetc(ACCMUT_FILE *fp);
-
-size_t __accmut__fread(void *buf, size_t size, size_t count, ACCMUT_FILE *fp);
-
-int __accmut__ungetc(int c, ACCMUT_FILE *fp);
-
-int __accmut__fscanf(ACCMUT_FILE *fp, const char *format, ...);
-
-
-int __accmut__fputc(int c, ACCMUT_FILE *fp);
-//putc implemented as a macro
-#define __accmut__putc(c, f) ( __accmut__fputc(c, f) )
-
-int __accmut__fputs(const char *s, ACCMUT_FILE *fp);
-
-int __accmut__puts(const char *s);
-
-int __accmut__fprintf(ACCMUT_FILE *fp, const char *format, ...);
-
-int __accmut__printf(const char *format, ...);
-
-size_t __accmut__fwrite(const void *buf, size_t size, size_t count, ACCMUT_FILE *fp);
-
-void __accmut__perror(const char *s);
-
-int __accmut__fflush(ACCMUT_FILE *stream);
-
+#ifdef __cplusplus
+};
 #endif
+
+#define __accmutv2__checkfd() do {\
+    if (MUTATION_ID == 0) {\
+        fprintf(stderr, "Check fd at %s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);\
+        __accmutv2__checkfd_func();\
+    }\
+} while (0)\
+
+#endif //LLVM_ACCMUT_IO_H
