@@ -23,7 +23,7 @@
     }\
 } while (0)
 #else
-#define check_assert(b)
+#define check_assert(b, dumper)
 #endif
 #define only_origin(x) (MUTATION_ID == 0 ? x : 0)
 
@@ -47,12 +47,18 @@ void dump_mem(void *a, void *b, size_t size) {
     }
 }
 
-#define check_mem(a, b, size) check_assert(!memcmp(a, b, size), dump_mem(a, b, size));
+#define check_mem(a, b, size) check_assert(!memcmp(a, b, size), dump_mem(a, b, size))
 #define check_eq(a, b) check_assert((a) == (b), \
     fprintf(stderr, "\tLeft = %ld, Right = %ld\n", (long)a, (long)b)\
-);
+)
 #define check_neq(a, b) check_assert((a) != (b), \
     fprintf(stderr, "\tLeft = %ld, Right = %ld\n", (long)a, (long)b)\
-);
+)
+#define check_null(a) check_assert(!(a),\
+    fprintf(stderr, "Pointer is not null\n")\
+)
+#define check_nonnull(a) check_assert((a),\
+    fprintf(stderr, "Pointer is null\n")\
+)
 
 #endif //LLVM_ACCMUT_IO_CHECK_H
