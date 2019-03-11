@@ -6,7 +6,11 @@ add_llvm_library(AccMutRuntimeV2
         accmut_GoodVar.cpp
         accmut_GoodVar_fork.c
         accmut_io.c
-        accmut_io_fd.cpp
+        io/accmut_io_fd.cpp
+        io/accmut_io_stdio.cpp
+        io/accmut_io_fdmap.cpp
+        io/accmut_io_unix.cpp
+        io/accmut_io_stdio_support.cpp
         accmut_io_cleanup.cpp
 
         ADDITIONAL_HEADER_DIRS
