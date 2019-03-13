@@ -5,6 +5,7 @@
 #include <llvm/AccMutRuntimeV2/accmut_config.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fd.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fdmap.h>
+#include <llvm/AccMutRuntimeV2/io/accmut_io_buf_ori.h>
 
 off_t real_file_descriptor::lseek(off_t offset, int whence) {
     off_t newpos;
@@ -100,6 +101,52 @@ int real_file_descriptor::eof() {
     return 0;
 }
 
+size_t real_file_descriptor::readobj(void *buf, size_t size, size_t nitem, int ungotchar) {
+    size_t request = size * nitem;
+    if (request == 0)
+        return 0;
+    if (ungotchar == EOF) {
+        if (pos + request > this->size) {
+            memcpy(buf, buffer.data() + pos, size - pos);
+            size_t res = (this->size - pos) / size;
+            pos = this->size;
+            return res;
+        } else {
+            memcpy(buf, buffer.data() + pos, request);
+            pos += request;
+            return (int) nitem;
+        }
+    } else {
+        ((char *) buf)[0] = (char) ungotchar;
+        if (pos + request > this->size + 1) {
+            memcpy((char *) buf + 1, buffer.data() + pos, size - pos);
+            size_t res = (this->size - pos + 1) / size;
+            pos = this->size;
+            return res;
+        } else {
+            memcpy((char *) buf + 1, buffer.data() + pos, request - 1);
+            pos += request - 1;
+            return (int) nitem;
+        }
+    }
+}
+
+int real_file_descriptor::getc() {
+    if (pos >= size)
+        return EOF;
+    int ret = buffer[pos];
+    pos++;
+    return ret;
+}
+
+int real_file_descriptor::printf(const char *format, va_list ap) {
+    int ret = vsprintf(buf_ori, format, ap);
+    if (ret < 0)
+        return ret;
+    write(buf_ori, (size_t) ret);
+    return ret;
+}
+
 real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(fd, REAL_FILE) {
     this->flags = flags;
     struct stat sb;
@@ -110,6 +157,7 @@ real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(
         return;
     buffer.resize(sb.st_size + 10);
     memcpy(buffer.data(), buf, sb.st_size);
+    munmap(buf, sb.st_size);
     size = sb.st_size;
     if (flags & O_APPEND)
         pos = size;
@@ -134,5 +182,9 @@ ssize_t stdout_file_descriptor::write(const void *buf, size_t count) {
 
 int stdout_file_descriptor::puts(const char *s) {
     return 1;
+}
+
+int stdout_file_descriptor::printf(const char *format, va_list ap) {
+    return vsprintf(buf_ori, format, ap);
 }
 

@@ -5,16 +5,17 @@
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fd.h>
 #include <llvm/AccMutRuntimeV2/accmut_io.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_stdio_support.h>
+#include <llvm/AccMutRuntimeV2/io/accmut_io_buf_ori.h>
+
 
 #define io_log_err(...) do {\
     fprintf(stderr, "Error [MUT: %d]: ", MUTATION_ID);\
     fprintf(stderr, __VA_ARGS__);\
 } while (0)
 
-static char buf_ori[1000000];
-
 extern "C" {
 
+/** File management **/
 ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode) {
     int flags;
     switch (mode[0]) {
@@ -33,7 +34,7 @@ ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode) {
     }
     if (mode[1] == '+') {
         flags |= O_RDWR;
-    } else if (mode[1] != 0) {
+    } else if (mode[1] != 0 && mode[1] != 'b') {
         io_log_err("Unknown fopen mode %s", "mode");
         exit(-1);
     } else if (mode[0] == 'r') {
@@ -71,6 +72,22 @@ int __accmutv2__fclose(ACCMUTV2_FILE *fp) {
     return ret;
 }
 
+ACCMUTV2_FILE *__accmutv2__freopen(const char *path, const char *mode, ACCMUTV2_FILE *fp) {
+    // TODO: should check mode
+    ACCMUTV2_FILE *newfp = __accmutv2__fopen(path, mode);
+    if (!newfp)
+        return nullptr;
+    int status = __accmutv2__fclose(fp);
+    if (status < 0) {
+        __accmutv2__fclose(newfp);
+        return nullptr;
+    }
+    *fp = *newfp;
+    return fp;
+}
+
+/** File status **/
+
 int __accmutv2__feof(ACCMUTV2_FILE *fp) {
     int ret = fp->eof_seen;
     int ori_ret = only_origin(::feof(fp->orifile));
@@ -80,6 +97,62 @@ int __accmutv2__feof(ACCMUTV2_FILE *fp) {
 
 int __accmutv2__fileno(ACCMUTV2_FILE *fp) {
     return fp->fd;
+}
+
+int __accmutv2__fflush(ACCMUTV2_FILE *fp) {
+    return 0;
+}
+
+int __accmutv2__ferror(ACCMUTV2_FILE *fp) {
+    return 0;
+}
+
+/** File position **/
+
+int __accmutv2__fseek(ACCMUTV2_FILE *fp, long offset, int whence) {
+    fp->unget_char = EOF;
+    fp->eof_seen = false;
+    off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
+    off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
+    check_eq(ret, ori_ret);
+    return (int) ret;
+}
+
+long __accmutv2__ftell(ACCMUTV2_FILE *fp) {
+    return __accmutv2__fseek(fp, 0, SEEK_CUR);
+}
+
+int __accmutv2__fseeko(ACCMUTV2_FILE *fp, off_t offset, int whence) {
+    fp->unget_char = EOF;
+    fp->eof_seen = false;
+    off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
+    off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
+    check_eq(ret, ori_ret);
+    return (int) ret;
+}
+
+off_t __accmutv2__ftello(ACCMUTV2_FILE *fp) {
+    return __accmutv2__fseek(fp, 0, SEEK_CUR);
+}
+
+void __accmutv2__rewind(ACCMUTV2_FILE *fp) {
+    (void) __accmutv2__fseek(fp, 0L, SEEK_SET);
+}
+
+/** Input **/
+
+size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE restrict *stream) {
+    if (stream->eof_seen)
+        return 0;
+    size_t ret = __accmutv2__fdread__nosync(stream->fd, ptr, size, nitems, stream->unget_char);
+    if (nitems * size != 0)
+        stream->unget_char = EOF;
+    size_t ori_ret = only_origin(::fread(ptr, size, nitems, stream->orifile));
+    if (ret != nitems)
+        stream->eof_seen = true;
+    check_eq(ret, ori_ret);
+    check_samebool(stream->eof_seen, feof(stream->orifile));
+    return ret;
 }
 
 char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp) {
@@ -111,18 +184,28 @@ char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp) {
         return nullptr;
     }
     check_streq(ret, ori_ret);
+    check_samebool(fp->eof_seen, feof(fp->orifile));
     return ret;
 }
 
-int __accmutv2__fputs(const char *buf, ACCMUTV2_FILE *fp) {
-    int ret = __accmutv2__fdputs__nosync(fp->fd, buf);
-    int ori_ret = only_origin(::fputs(buf, fp->orifile));
-    if (ret == EOF) {
-        check_eq(ori_ret, EOF);
+int __accmutv2__fgetc(ACCMUTV2_FILE *fp) {
+    int ret;
+    if (fp->unget_char != EOF) {
+        ret = fp->unget_char;
+        fp->unget_char = EOF;
     } else {
-        check_neq(ori_ret, EOF);
+        ret = __accmutv2__fdgetc__nosync(fp->fd);
+        if (ret == EOF)
+            fp->eof_seen = true;
     }
+    int ori_ret = only_origin(::fgetc(fp->orifile));
+    check_eq(ret, ori_ret);
+    check_samebool(fp->eof_seen, feof(fp->orifile));
     return ret;
+}
+
+int __accmutv2__getc(ACCMUTV2_FILE *fp) {
+    return __accmutv2__fgetc(fp);
 }
 
 int __accmutv2__ungetc(int c, ACCMUTV2_FILE *fp) {
@@ -133,21 +216,55 @@ int __accmutv2__ungetc(int c, ACCMUTV2_FILE *fp) {
     return c;
 }
 
-int __accmutv2__fseek(ACCMUTV2_FILE *fp, long offset, int whence) {
-    fp->unget_char = EOF;
-    fp->eof_seen = false;
-    off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
-    off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
+/** Output **/
+
+int __accmutv2__fputs(const char *buf, ACCMUTV2_FILE *fp) {
+    int ret = __accmutv2__fdputs__nosync(fp->fd, buf);
+    int ori_ret = only_origin(::fputs(buf, fp->orifile));
+    only_origin(::fflush(fp->orifile));
+    if (ret == EOF) {
+        check_eq(ori_ret, EOF);
+    } else {
+        check_neq(ori_ret, EOF);
+    }
+    return ret;
+}
+
+size_t __accmutv2__fwrite(const void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE *restrict stream) {
+    size_t ret = __accmutv2__fdwrite__nosync(stream->fd, ptr, size, nitems);
+    size_t ori_ret = only_origin(::fwrite(ptr, size, nitems, stream->orifile));
+    only_origin(::fflush(stream->orifile));
     check_eq(ret, ori_ret);
-    return (int) ret;
+    return ret;
 }
 
-long __accmutv2__ftell(ACCMUTV2_FILE *fp) {
-    return __accmutv2__fseek(fp, 0, SEEK_CUR);
+int __accmutv2__vfprintf(ACCMUTV2_FILE *restrict stream, const char *restrict format, va_list ap) {
+    va_list ap1;
+    va_copy(ap, ap1);
+    int ret = __accmutv2__fdprintf__nosync(stream->fd, format, ap);
+    int ori_ret = only_origin(vfprintf(stream->orifile, format, ap));
+    check_eq(ret, ori_ret);
+    return ret;
 }
 
-void __accmutv2__rewind(ACCMUTV2_FILE *fp) {
-    (void) __accmutv2__fseek(fp, 0L, SEEK_SET);
+int __accmutv2__fprintf(ACCMUTV2_FILE *restrict stream, const char *restrict format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = __accmutv2__vfprintf(stream, format, ap);
+    va_end(ap);
+    return ret;
+}
+
+int __accmutv2__printf(const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = __accmutv2__vfprintf(accmutv2_stdout, format, ap);
+    va_end(ap);
+    return ret;
+}
+
+void __accmutv2__perror(const char *s) {
+    __accmutv2__fprintf(accmutv2_stderr, "%s\n", s);
 }
 
 }

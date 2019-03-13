@@ -34,6 +34,12 @@ public:
 
     virtual int eof() = 0;
 
+    virtual size_t readobj(void *buf, size_t size, size_t nitem, int ungotchar) = 0;
+
+    virtual int getc() = 0;
+
+    virtual int printf(const char *format, va_list ap) = 0;
+
     virtual ~file_descriptor() = default;
 
     inline explicit file_descriptor(int fd, TAG tag) : tag(tag), fd(fd) {};
@@ -63,6 +69,12 @@ public:
 
     int eof() override;
 
+    size_t readobj(void *buf, size_t size, size_t nitem, int ungotchar) override;
+
+    int getc() override;
+
+    int printf(const char *format, va_list ap) override;
+
     real_file_descriptor(int fd, int flags);
 };
 
@@ -85,6 +97,16 @@ public:
         return 0;
     }
 
+    inline size_t readobj(void *buf, size_t size, size_t nitem, int ungotchar) override {
+        check_assert(false, fprintf(stderr, "readobj for std file not implemented"));
+        return 0;
+    }
+
+    inline int getc() override {
+        check_assert(false, fprintf(stderr, "getc for std file not implemented"));
+        return EOF;
+    }
+
     inline explicit std_file_descriptor(int fd, TAG tag) : file_descriptor(fd, tag) {
         ok = true;
     }
@@ -98,6 +120,10 @@ public:
         return EOF;
     }
 
+    inline int printf(const char *format, va_list ap) override {
+        return EOF;
+    }
+
     inline explicit stdin_file_descriptor(int fd) : std_file_descriptor(fd, STDIN_FILE) {};
 };
 
@@ -106,6 +132,8 @@ public:
     ssize_t write(const void *buf, size_t count) override;
 
     int puts(const char *s) override;
+
+    int printf(const char *format, va_list ap) override;
 
     inline explicit stdout_file_descriptor(int fd) : std_file_descriptor(fd, STDOUT_FILE) {};
 };

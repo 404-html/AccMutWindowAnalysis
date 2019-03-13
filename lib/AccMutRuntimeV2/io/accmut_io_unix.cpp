@@ -5,9 +5,7 @@
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fd.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fdmap.h>
 #include <llvm/AccMutRuntimeV2/accmut_io.h>
-#include <algorithm>
-
-static char buf_ori[1000000];
+#include <llvm/AccMutRuntimeV2/io/accmut_io_buf_ori.h>
 
 void check_all() {
     for (auto &fd : opened_file_list) {
