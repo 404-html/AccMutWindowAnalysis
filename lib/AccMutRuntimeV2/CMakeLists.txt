@@ -11,6 +11,7 @@ add_llvm_library(AccMutRuntimeV2
         io/accmut_io_unix.cpp
         io/accmut_io_stdio_support.cpp
         io/accmut_io_buf_ori.cpp
+        io/accmut_io_scanf.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/AccMutRuntimeV2
