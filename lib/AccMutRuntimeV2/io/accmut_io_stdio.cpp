@@ -142,14 +142,17 @@ void __accmutv2__rewind(ACCMUTV2_FILE *fp) {
 /** Input **/
 
 size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE restrict *stream) {
-    if (stream->eof_seen)
-        return 0;
-    size_t ret = __accmutv2__fdread__nosync(stream->fd, ptr, size, nitems, stream->unget_char);
-    if (nitems * size != 0)
-        stream->unget_char = EOF;
+    size_t ret;
+    if (stream->eof_seen) {
+        ret = 0;
+    } else {
+        ret = __accmutv2__fdread__nosync(stream->fd, ptr, size, nitems, stream->unget_char);
+        if (nitems * size != 0)
+            stream->unget_char = EOF;
+        if (ret != nitems)
+            stream->eof_seen = true;
+    }
     size_t ori_ret = only_origin(::fread(ptr, size, nitems, stream->orifile));
-    if (ret != nitems)
-        stream->eof_seen = true;
     check_eq(ret, ori_ret);
     check_samebool(stream->eof_seen, feof(stream->orifile));
     return ret;
@@ -157,24 +160,28 @@ size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV
 
 char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp) {
     char *ret = buf;
-    if (size <= 0) {
+    if (fp->eof_seen) {
         ret = nullptr;
-    } else if (size == 1) {
-        buf[0] = 0;
-        ret = buf;
     } else {
-        if (fp->eof_seen)
+        if (size <= 0) {
             ret = nullptr;
-        if (fp->unget_char != EOF) {
-            buf[0] = fp->unget_char;
-            fp->unget_char = EOF;
-            char *r1 = __accmutv2__fdgets__nosync(fp->fd, buf + 1, size - 1);
-            if (!r1)
-                fp->eof_seen = true;
+        } else if (size == 1) {
+            buf[0] = 0;
+            ret = buf;
         } else {
-            ret = __accmutv2__fdgets__nosync(fp->fd, buf, size);
-            if (!ret)
-                fp->eof_seen = true;
+            if (fp->eof_seen)
+                ret = nullptr;
+            if (fp->unget_char != EOF) {
+                buf[0] = fp->unget_char;
+                fp->unget_char = EOF;
+                char *r1 = __accmutv2__fdgets__nosync(fp->fd, buf + 1, size - 1);
+                if (!r1)
+                    fp->eof_seen = true;
+            } else {
+                ret = __accmutv2__fdgets__nosync(fp->fd, buf, size);
+                if (!ret)
+                    fp->eof_seen = true;
+            }
         }
     }
     char *ori_ret = only_origin(::fgets(buf_ori, size, fp->orifile));
@@ -190,13 +197,17 @@ char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp) {
 
 int __accmutv2__fgetc(ACCMUTV2_FILE *fp) {
     int ret;
-    if (fp->unget_char != EOF) {
-        ret = fp->unget_char;
-        fp->unget_char = EOF;
+    if (fp->eof_seen) {
+        ret = EOF;
     } else {
-        ret = __accmutv2__fdgetc__nosync(fp->fd);
-        if (ret == EOF)
-            fp->eof_seen = true;
+        if (fp->unget_char != EOF) {
+            ret = fp->unget_char;
+            fp->unget_char = EOF;
+        } else {
+            ret = __accmutv2__fdgetc__nosync(fp->fd);
+            if (ret == EOF)
+                fp->eof_seen = true;
+        }
     }
     int ori_ret = only_origin(::fgetc(fp->orifile));
     check_eq(ret, ori_ret);
