@@ -5,7 +5,6 @@
 #include <llvm/AccMutRuntimeV2/accmut_config.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fd.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fdmap.h>
-#include <algorithm>
 
 off_t real_file_descriptor::lseek(off_t offset, int whence) {
     off_t newpos;
@@ -27,7 +26,7 @@ off_t real_file_descriptor::lseek(off_t offset, int whence) {
     return pos;
 }
 
-off_t real_file_descriptor::read(void *buf, size_t count) {
+ssize_t real_file_descriptor::read(void *buf, size_t count) {
     if (flags & O_WRONLY) {
         errno = EBADF;
         return -1;
@@ -57,7 +56,7 @@ ssize_t real_file_descriptor::write(const void *buf, size_t count) {
         pos += count;
         return count;
     } else {
-        buffer.resize(std::max(buffer.size() * 2, pos + count));
+        buffer.resize(std::max<size_t>(buffer.size() * 2, pos + count));
         size = pos + count;
         memcpy(buffer.data() + pos, buf, count);
         pos += count;

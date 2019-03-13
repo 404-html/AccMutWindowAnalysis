@@ -12,7 +12,7 @@ extern "C" {
 /* Unix IO without synchronization */
 int __accmutv2__register(int fd, int flags);
 int __accmutv2__deregister(int fd);
-ssize_t __accmutv2__lseek__nosync(int fd, off_t offset, int whence);
+off_t __accmutv2__lseek__nosync(int fd, off_t offset, int whence);
 ssize_t __accmutv2__read__nosync(int fd, void *buf, size_t count);
 ssize_t __accmutv2__write__nosync(int fd, const void *buf, size_t count);
 
@@ -20,7 +20,7 @@ ssize_t __accmutv2__write__nosync(int fd, const void *buf, size_t count);
 int __accmutv2__open(const char *pathname, int flags, ...);
 int __accmutv2__creat(const char *pathname, mode_t mode);
 int __accmutv2__close(int fd);
-ssize_t __accmutv2__lseek(int fd, off_t offset, int whence);
+off_t __accmutv2__lseek(int fd, off_t offset, int whence);
 ssize_t __accmutv2__read(int fd, void *buf, size_t count);
 ssize_t __accmutv2__write(int fd, const void *buf, size_t count);
 

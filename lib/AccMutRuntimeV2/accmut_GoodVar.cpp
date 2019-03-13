@@ -19,10 +19,14 @@ extern void __accmut__register(RegMutInfo *rmi);
 #include <vector>
 #include <map>
 #include <stack>
-#include <algorithm>
 
+#ifdef __APPLE__
+#define iflikely(x) if (__builtin_expect(!!(x), 1))
+#define ifunlikely(x) if (__builtin_expect(!!(x), 0))
+#else
 #define iflikely(x) if (__glibc_likely(x))
 #define ifunlikely(x) if (__glibc_unlikely(x))
+#endif
 
 using std::vector;
 using std::map;
