@@ -15,6 +15,10 @@
 
 extern "C" {
 
+ACCMUTV2_FILE *accmutv2_stdin;
+ACCMUTV2_FILE *accmutv2_stdout;
+ACCMUTV2_FILE *accmutv2_stderr;
+
 /** File management **/
 ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode) {
     int flags;
@@ -141,7 +145,7 @@ void __accmutv2__rewind(ACCMUTV2_FILE *fp) {
 
 /** Input **/
 
-size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE restrict *stream) {
+size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE *restrict stream) {
     size_t ret;
     if (stream->eof_seen) {
         ret = 0;

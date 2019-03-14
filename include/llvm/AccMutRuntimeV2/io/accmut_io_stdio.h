@@ -44,7 +44,7 @@ off_t __accmutv2__ftello(ACCMUTV2_FILE *fp);
 void __accmutv2__rewind(ACCMUTV2_FILE *fp);
 
 /** Input **/
-size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE restrict *stream);
+size_t __accmutv2__fread(void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE *restrict stream);
 char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp);
 int __accmutv2__fgetc(ACCMUTV2_FILE *fp);
 int __accmutv2__getc(ACCMUTV2_FILE *fp);
