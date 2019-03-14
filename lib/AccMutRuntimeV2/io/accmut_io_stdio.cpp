@@ -114,11 +114,17 @@ int __accmutv2__ferror(ACCMUTV2_FILE *fp) {
 /** File position **/
 
 int __accmutv2__fseek(ACCMUTV2_FILE *fp, long offset, int whence) {
-    fp->unget_char = EOF;
-    fp->eof_seen = false;
-    off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
-    if (ret != -1)
-        ret = 0;
+    off_t ret;
+    if (fp->unget_char != EOF && whence == SEEK_CUR) {
+        errno = ESPIPE;
+        ret = -1;
+    } else {
+        fp->unget_char = EOF;
+        fp->eof_seen = false;
+        ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
+        if (ret != -1)
+            ret = 0;
+    }
     off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
     check_eq(ret, ori_ret);
     return (int) ret;
