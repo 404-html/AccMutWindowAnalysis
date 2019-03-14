@@ -43,6 +43,7 @@ TEST(unix,
              check_mem(buf, "qwer\n", 5);
              ret = read(fd, buf, 10);
              check_eq(ret, 0);
+             check();
              ret = close(fd);
              check_eq(ret, 0);
              fd = open("test-unix1.txt", O_RDONLY);
@@ -52,17 +53,21 @@ TEST(unix,
              ret = read(fd, buf, 40);
              check_eq(ret, 20);
              check_mem(buf, "abcd\nefgh\n\0\0\0\0\0qwer\n", 20);
+             check();
              ret = close(3);
              check_eq(ret, 0);
              fd = creat("test-unix1.txt", 0666);
              check_eq(fd, 3);
+             check();
              ret = close(3);
              check_eq(ret, 0);
              fd = open("test-unix1.txt", O_RDONLY);
              check_eq(fd, 3);
              ret = read(fd, buf, 10);
              check_eq(ret, 0);
-             close(fd);
+             check();
+             ret = close(fd);
+             check_eq(ret, 0);
      ),
      RUN(
              unlink("test-unix1.txt");
