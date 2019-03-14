@@ -159,6 +159,12 @@ bool real_file_descriptor::canwrite() {
     return (flags & O_ACCMODE) != O_RDONLY;
 }
 
+int real_file_descriptor::putc(int c) {
+    buf_ori[0] = (char) c;
+    write(buf_ori, 1);
+    return c;
+}
+
 real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(fd, REAL_FILE) {
     this->flags = flags;
     struct stat sb;

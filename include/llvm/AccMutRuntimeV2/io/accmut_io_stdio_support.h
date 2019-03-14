@@ -23,4 +23,6 @@ int __accmutv2__fdgetc__nosync(int fd);
 
 int __accmutv2__fdprintf__nosync(int fd, const char *format, va_list ap);
 
+int __accmutv2__fdputc__nosync(int fd, int c);
+
 #endif //LLVM_ACCMUT_IO_STDIO_SUPPORT_H

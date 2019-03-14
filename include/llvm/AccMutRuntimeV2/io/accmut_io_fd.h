@@ -44,6 +44,8 @@ public:
 
     virtual bool canwrite() = 0;
 
+    virtual int putc(int c) = 0;
+
     virtual ~file_descriptor() = default;
 
     inline explicit file_descriptor(int fd, TAG tag) : tag(tag), fd(fd) {};
@@ -82,6 +84,8 @@ public:
     bool canread() override;
 
     bool canwrite() override;
+
+    int putc(int c) override;
 
     real_file_descriptor(int fd, int flags);
 };
@@ -140,6 +144,10 @@ public:
         return true;
     }
 
+    int putc(int c) override {
+        return EOF;
+    }
+
     inline explicit stdin_file_descriptor(int fd) : std_file_descriptor(fd, STDIN_FILE) {};
 };
 
@@ -157,6 +165,10 @@ public:
 
     inline bool canwrite() override {
         return false;
+    }
+
+    inline int putc(int c) override {
+        return c;
     }
 
     inline explicit stdout_file_descriptor(int fd) : std_file_descriptor(fd, STDOUT_FILE) {};

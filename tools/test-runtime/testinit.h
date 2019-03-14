@@ -60,6 +60,7 @@ DEFINE_ACCMUT_FUNC(vfprintf);
 DEFINE_ACCMUT_FUNC(fprintf);
 DEFINE_ACCMUT_FUNC(printf);
 DEFINE_ACCMUT_FUNC(perror);
+DEFINE_ACCMUT_FUNC(fputc);
 
 #define ADD_ACCMUT_FUNC(name) ADD_FUNC(_ ## name, name)
 
@@ -95,7 +96,8 @@ ADD_ACCMUT_FUNC(fwrite);\
 ADD_ACCMUT_FUNC(vfprintf);\
 ADD_ACCMUT_FUNC(fprintf);\
 ADD_ACCMUT_FUNC(printf);\
-ADD_ACCMUT_FUNC(perror);
+ADD_ACCMUT_FUNC(perror);\
+ADD_ACCMUT_FUNC(fputc);
 
 #include "testdef.h"
 

@@ -71,3 +71,12 @@ int __accmutv2__fdprintf__nosync(int fd, const char *format, va_list ap) {
     }
     return fdstruct->printf(format, ap);
 }
+
+int __accmutv2__fdputc__nosync(int fd, int c) {
+    file_descriptor *fdstruct = fdmap[fd];
+    if (!fdstruct) {
+        errno = EBADF;
+        return 0;
+    }
+    return fdstruct->putc(c);
+}

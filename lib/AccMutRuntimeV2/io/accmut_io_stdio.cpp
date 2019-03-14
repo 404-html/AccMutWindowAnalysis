@@ -243,6 +243,14 @@ int __accmutv2__ungetc(int c, ACCMUTV2_FILE *fp) {
 
 /** Output **/
 
+int __accmutv2__fputc(int c, ACCMUTV2_FILE *fp) {
+    int ret = __accmutv2__fdputc__nosync(fp->fd, c);
+    int ori_ret = only_origin(::fputc(c, fp->orifile));
+    only_origin(::fflush(fp->orifile));
+    check_eq(ret, ori_ret);
+    return ret;
+}
+
 int __accmutv2__fputs(const char *buf, ACCMUTV2_FILE *fp) {
     int ret = __accmutv2__fdputs__nosync(fp->fd, buf);
     int ori_ret = only_origin(::fputs(buf, fp->orifile));

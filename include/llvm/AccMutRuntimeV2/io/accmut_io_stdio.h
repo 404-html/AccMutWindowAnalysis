@@ -49,9 +49,10 @@ int __accmutv2__getc(ACCMUTV2_FILE *fp);
 int __accmutv2__ungetc(int c, ACCMUTV2_FILE *fp);
 int __accmutv2__vfscanf(ACCMUTV2_FILE *fp, const char *format, va_list ap);
 int __accmutv2__fscanf(ACCMUTV2_FILE *fp, const char *format, ...);
-int __accmut__scanf(const char *format, ...);
+int __accmutv2__scanf(const char *format, ...);
 
 /** Output **/
+int __accmutv2__fputc(int c, ACCMUTV2_FILE *fp);
 int __accmutv2__fputs(const char *buf, ACCMUTV2_FILE *fp);
 size_t __accmutv2__fwrite(const void *restrict ptr, size_t size, size_t nitems, ACCMUTV2_FILE *restrict stream);
 int __accmutv2__vfprintf(ACCMUTV2_FILE *restrict stream, const char *restrict format, va_list ap);
