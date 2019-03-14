@@ -8,7 +8,13 @@
 #include "accmut_io_fd.h"
 #include <list>
 
-extern file_descriptor *fdmap[65536];
-extern std::list<int> opened_file_list;
+typedef file_descriptor *fdmap_t[65536];
+
+fdmap_t &get_fdmap();
+
+std::list<int> &get_opened_file_list();
+
+#define fdmap get_fdmap()
+#define opened_file_list get_opened_file_list()
 
 #endif //LLVM_ACCMUT_IO_FDMAP_H

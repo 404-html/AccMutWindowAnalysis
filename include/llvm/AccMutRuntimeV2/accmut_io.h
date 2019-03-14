@@ -7,5 +7,6 @@
 
 #include "io/accmut_io_unix.h"
 #include "io/accmut_io_stdio.h"
+#include "io/accmut_io_init.h"
 
 #endif //LLVM_ACCMUT_IO_H
