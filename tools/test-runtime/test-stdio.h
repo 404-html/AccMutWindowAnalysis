@@ -212,6 +212,26 @@ TEST(stdio_scanf,
              check_eq(chard, 'b');
              check_streq(buf, "str");
              check_eq(floatd, 1.5f);
+             check_eq(feof(fp), 1);
+             ret = fscanf(fp, "%d", &intd);
+             check_eq(ret, -1);
+             check_eq(intd, 1345);
+             check_eq(feof(fp), 1);
+
+             fseek(fp, -1, SEEK_END);
+             ret = fscanf(fp, "%c", &chard);
+             check_eq(ret, 1);
+             check_eq(chard, '5');
+             check_eq(feof(fp), 0);
+
+             fseek(fp, -1, SEEK_END);
+
+             ret = fputc('c', fp);
+             check_eq(ret, 'c');
+             ret = fscanf(fp, "%d", &intd);
+             check_eq(ret, -1);
+             check_eq(feof(fp), 1);
+
              check();
              fclose(fp);
      ),

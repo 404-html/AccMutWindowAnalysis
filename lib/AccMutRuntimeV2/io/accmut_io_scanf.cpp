@@ -482,6 +482,7 @@ int __accmutv2__vfscanf(ACCMUTV2_FILE *fp, const char *format, va_list ap) {
     }
     int ori_ret = only_origin(::vfscanf(fp->orifile, format, ap1));
     check_eq(ret, ori_ret);
+    check_samebool(fp->eof_seen, ::feof(fp->orifile));
     return ret;
 }
 
@@ -493,7 +494,7 @@ int __accmutv2__fscanf(ACCMUTV2_FILE *fp, const char *format, ...) {
     return ret;
 }
 
-int __accmut__scanf(const char *format, ...) {
+int __accmutv2__scanf(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
     int ret = __accmutv2__vfprintf(accmutv2_stdin, format, ap);
