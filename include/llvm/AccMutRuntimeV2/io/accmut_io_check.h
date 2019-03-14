@@ -45,9 +45,9 @@ extern FILE *__check_stderr;
 #define check_assert(b, dumper)
 #endif
 
-inline void dump_mem(void *a, void *b, size_t size) {
-    auto *a1 = (char *) a;
-    auto *b1 = (char *) b;
+inline void dump_mem(const void *a, const void *b, size_t size) {
+    auto *a1 = (const char *) a;
+    auto *b1 = (const char *) b;
     for (size_t i = 0; i < size; ++i) {
         if (a1[i] != b1[i]) {
             __check_fprintf(__check_stderr, "\tMemory difference starts form pos %ld\n", size);
