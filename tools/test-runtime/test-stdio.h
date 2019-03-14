@@ -194,3 +194,4 @@ TEST(stdio_input,
              unlink("test-stdio4.txt");
      )
 )
+

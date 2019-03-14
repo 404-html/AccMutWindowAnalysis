@@ -10,7 +10,7 @@
 #define TEST(__name, __prog, __cleanup) \
 template <int __test_tplarg> \
 struct __name ## _test {\
-    ALL_ADDED();\
+    ALL_ADDED()\
     inline void cleanup() {\
         __cleanup;\
     }\
