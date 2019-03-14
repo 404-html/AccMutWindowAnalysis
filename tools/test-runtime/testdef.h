@@ -30,7 +30,8 @@ struct __name ## _runner {\
         __name ## _test<0> oritest;\
         pid_t pid = fork();\
         int status;\
-        if (pid != 0) {\
+        int retst;\
+        if (pid == 0) {\
             /* child */\
             oritest.cleanup();\
             oritest();\
@@ -39,10 +40,12 @@ struct __name ## _runner {\
         wait(&status);\
         if (!WIFEXITED(status))\
             fprintf(stderr, "**** ori not exited normally\n");\
+        else if ((retst = WEXITSTATUS(status)) != 0)\
+            fprintf(stderr, "**** ori not exited normally with %d\n", retst);\
         fprintf(stderr, "---- Running new\n");\
         __name ## _test<1> newtest;\
         pid = fork();\
-        if (pid != 0) {\
+        if (pid == 0) {\
             newtest.cleanup();\
             newtest();\
             exit(0);\
@@ -50,6 +53,8 @@ struct __name ## _runner {\
         wait(&status);\
         if (!WIFEXITED(status))\
             fprintf(stderr, "**** new not exited normally\n");\
+        else if ((retst = WEXITSTATUS(status)) != 0)\
+            fprintf(stderr, "**** new not exited normally with %d\n", retst);\
         fprintf(stderr, "---- Finish running test %s\n", #__name);\
     }\
 };
