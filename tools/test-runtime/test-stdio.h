@@ -195,3 +195,27 @@ TEST(stdio_input,
      )
 )
 
+TEST(stdio_scanf,
+     RUN(
+             int
+             ret;
+             auto fp = fopen("test-stdio5.txt", "w+");
+             ret = fputs("1345 b str 1.5", fp);
+             rewind(fp);
+             int intd;
+             char chard;
+             char buf[100];
+             float floatd;
+             ret = fscanf(fp, "%d %c%s%f", &intd, &chard, buf, &floatd);
+             check_eq(ret, 4);
+             check_eq(intd, 1345);
+             check_eq(chard, 'b');
+             check_streq(buf, "str");
+             check_eq(floatd, 1.5f);
+             check();
+             fclose(fp);
+     ),
+     RUN(
+             unlink("test-stdio5.txt");
+     )
+)

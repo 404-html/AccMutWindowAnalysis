@@ -12,5 +12,6 @@ int main() {
     // stdio_positioning_runner for1;
     // stdio_file_status_runner fsr1;
     // stdio_unix_interoperate_runner fuir1;
-    stdio_input_runner fir1;
+    // stdio_input_runner fir1;
+    stdio_scanf_runner ssr1;
 }

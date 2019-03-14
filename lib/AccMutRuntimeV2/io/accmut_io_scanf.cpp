@@ -7,7 +7,6 @@
 #include <cstdarg>
 #include <llvm/AccMutRuntimeV2/accmut_io.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_stdio_support.h>
-#include <cstdlib>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_check.h>
 
 #define FL_LJUST    0x0001      /* left-justify field */
@@ -472,14 +471,14 @@ static int __accmutv2__doscan(register ACCMUTV2_FILE *stream, const char *format
 int __accmutv2__vfscanf(ACCMUTV2_FILE *fp, const char *format, va_list ap) {
     int ret;
     va_list ap1;
-    va_copy(ap, ap1);
+    va_copy(ap1, ap);
     if (fp->eof_seen) {
         ret = EOF;
     } else if (__accmutv2__fdeof__nosync(fp->fd)) {
         fp->eof_seen = true;
         ret = EOF;
     } else {
-        ret = __accmutv2__doscan(fp, format, ap1);
+        ret = __accmutv2__doscan(fp, format, ap);
     }
     int ori_ret = only_origin(::vfscanf(fp->orifile, format, ap1));
     check_eq(ret, ori_ret);
