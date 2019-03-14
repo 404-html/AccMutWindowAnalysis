@@ -23,8 +23,8 @@ struct __name ## _test {\
         __prog;\
     }\
 };\
-struct __name ## runner {\
-    inline __name ## runner() {\
+struct __name ## _runner {\
+    inline __name ## _runner() {\
         fprintf(stderr, "---- Start running test %s\n", #__name);\
         fprintf(stderr, "---- Running ori\n");\
         __name ## _test<0> oritest;\
