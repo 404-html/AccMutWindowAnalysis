@@ -5,6 +5,9 @@
 #ifndef LLVM_ACCMUT_IO_UNIX_H
 #define LLVM_ACCMUT_IO_UNIX_H
 
+#include <unistd.h>
+#include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

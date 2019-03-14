@@ -54,7 +54,7 @@ size_t __accmutv2__fdwrite__nosync(int fd, const void *buf, size_t size, size_t 
     return (size_t) ret;
 }
 
-int __accmutv2__fdgetc_nosync(int fd) {
+int __accmutv2__fdgetc__nosync(int fd) {
     file_descriptor *fdstruct = fdmap[fd];
     if (!fdstruct) {
         errno = EBADF;
