@@ -167,7 +167,8 @@ ssize_t __accmutv2__read(int fd, void *buf, size_t count) {
     ssize_t ori_ret = only_origin(::read(fd, buf_ori, count));
     ssize_t ret = __accmutv2__read__nosync(fd, buf, count);
     check_eq(ori_ret, ret);
-    check_mem(buf, buf_ori, ret);
+    if (ret != -1)
+        check_mem(buf, buf_ori, ret);
     return ret;
 }
 
