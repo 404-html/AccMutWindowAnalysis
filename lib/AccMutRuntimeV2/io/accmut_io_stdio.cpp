@@ -117,26 +117,36 @@ int __accmutv2__fseek(ACCMUTV2_FILE *fp, long offset, int whence) {
     fp->unget_char = EOF;
     fp->eof_seen = false;
     off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
+    if (ret != -1)
+        ret = 0;
     off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
     check_eq(ret, ori_ret);
     return (int) ret;
 }
 
 long __accmutv2__ftell(ACCMUTV2_FILE *fp) {
-    return __accmutv2__fseek(fp, 0, SEEK_CUR);
+    off_t ret = __accmutv2__lseek__nosync(fp->fd, 0, SEEK_CUR);
+    off_t ori_ret = only_origin(::ftell(fp->orifile));
+    check_eq(ret, ori_ret);
+    return ret;
 }
 
 int __accmutv2__fseeko(ACCMUTV2_FILE *fp, off_t offset, int whence) {
     fp->unget_char = EOF;
     fp->eof_seen = false;
     off_t ret = __accmutv2__lseek__nosync(fp->fd, offset, whence);
-    off_t ori_ret = only_origin(::fseek(fp->orifile, offset, whence));
+    if (ret != -1)
+        ret = 0;
+    off_t ori_ret = only_origin(::fseeko(fp->orifile, offset, whence));
     check_eq(ret, ori_ret);
     return (int) ret;
 }
 
 off_t __accmutv2__ftello(ACCMUTV2_FILE *fp) {
-    return __accmutv2__fseek(fp, 0, SEEK_CUR);
+    off_t ret = __accmutv2__lseek__nosync(fp->fd, 0, SEEK_CUR);
+    off_t ori_ret = only_origin(::ftello(fp->orifile));
+    check_eq(ret, ori_ret);
+    return ret;
 }
 
 void __accmutv2__rewind(ACCMUTV2_FILE *fp) {
@@ -258,6 +268,7 @@ int __accmutv2__vfprintf(ACCMUTV2_FILE *restrict stream, const char *restrict fo
     va_copy(ap, ap1);
     int ret = __accmutv2__fdprintf__nosync(stream->fd, format, ap);
     int ori_ret = only_origin(vfprintf(stream->orifile, format, ap));
+    only_origin(::fflush(stream->orifile));
     check_eq(ret, ori_ret);
     return ret;
 }
