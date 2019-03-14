@@ -267,3 +267,25 @@ TEST(stdio_fread_fwrite,
              unlink("test-stdio6.txt");
      )
 )
+
+TEST(stdio_printf,
+     RUN(
+             int
+             ret;
+             auto fd = fopen("test-stdio7.txt", "w+");
+             char buf[100];
+             strcpy(buf, "abcde");
+             int i = 10;
+             long l = 12345678901234l;
+             double d = 1.4;
+             ret = fprintf(fd, "%d, %ld, %lf, %s", i, l, d, buf);
+             check_eq(ret, 35);
+             rewind(fd);
+             fgets(buf, 100, fd);
+             check_streq(buf, "10, 12345678901234, 1.400000, abcde");
+             fclose(fd);
+     ),
+     RUN(
+             unlink("test-stdio7.txt");
+     )
+)

@@ -274,9 +274,9 @@ size_t __accmutv2__fwrite(const void *restrict ptr, size_t size, size_t nitems, 
 
 int __accmutv2__vfprintf(ACCMUTV2_FILE *restrict stream, const char *restrict format, va_list ap) {
     va_list ap1;
-    va_copy(ap, ap1);
+    va_copy(ap1, ap);
     int ret = __accmutv2__fdprintf__nosync(stream->fd, format, ap);
-    int ori_ret = only_origin(vfprintf(stream->orifile, format, ap));
+    int ori_ret = only_origin(vfprintf(stream->orifile, format, ap1));
     only_origin(::fflush(stream->orifile));
     check_eq(ret, ori_ret);
     return ret;
