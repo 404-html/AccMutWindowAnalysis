@@ -69,7 +69,7 @@ ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode) {
 
 int __accmutv2__fclose(ACCMUTV2_FILE *fp) {
     int ret = __accmutv2__deregister(fp->fd);
-    if (MUTATION_ID == 0)
+    if (MUTATION_ID == 0 && fp->orifile)
         ret &= fclose(fp->orifile);
     else check_null(fp->orifile);
     delete fp;

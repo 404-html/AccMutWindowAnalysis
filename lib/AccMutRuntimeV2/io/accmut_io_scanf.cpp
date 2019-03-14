@@ -497,7 +497,7 @@ int __accmutv2__fscanf(ACCMUTV2_FILE *fp, const char *format, ...) {
 int __accmutv2__scanf(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
-    int ret = __accmutv2__vfprintf(accmutv2_stdin, format, ap);
+    int ret = __accmutv2__vfscanf(accmutv2_stdin, format, ap);
     va_end(ap);
     return ret;
 }
