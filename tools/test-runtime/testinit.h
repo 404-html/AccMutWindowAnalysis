@@ -26,27 +26,76 @@ inline void print_new() {
 }
 
 DEFINE_FUNC(_print, print_ori, print_new);
-DEFINE_FUNC(_open, open, __accmutv2__open);
-DEFINE_FUNC(_creat, creat, __accmutv2__creat);
-DEFINE_FUNC(_lseek, lseek, __accmutv2__lseek);
-DEFINE_FUNC(_close, close, __accmutv2__close);
-DEFINE_FUNC(_read, read, __accmutv2__read);
-DEFINE_FUNC(_write, write, __accmutv2__write);
-DEFINE_FUNC(_fopen, fopen, __accmutv2__fopen);
-DEFINE_FUNC(_fclose, fclose, __accmutv2__fclose);
-DEFINE_FUNC(_fputs, fputs, __accmutv2__fputs);
+#define DEFINE_ACCMUT_FUNC(name)\
+    DEFINE_FUNC(_ ## name, name, __accmutv2__ ## name)
+DEFINE_ACCMUT_FUNC(open);
+DEFINE_ACCMUT_FUNC(creat);
+DEFINE_ACCMUT_FUNC(lseek);
+DEFINE_ACCMUT_FUNC(close);
+DEFINE_ACCMUT_FUNC(read);
+DEFINE_ACCMUT_FUNC(write);
+DEFINE_ACCMUT_FUNC(fopen);
+DEFINE_ACCMUT_FUNC(fclose);
+DEFINE_ACCMUT_FUNC(freopen);
+DEFINE_ACCMUT_FUNC(feof);
+DEFINE_ACCMUT_FUNC(fileno);
+DEFINE_ACCMUT_FUNC(fflush);
+DEFINE_ACCMUT_FUNC(ferror);
+DEFINE_ACCMUT_FUNC(fseek);
+DEFINE_ACCMUT_FUNC(ftell);
+DEFINE_ACCMUT_FUNC(fseeko);
+DEFINE_ACCMUT_FUNC(ftello);
+DEFINE_ACCMUT_FUNC(rewind);
+DEFINE_ACCMUT_FUNC(fread);
+DEFINE_ACCMUT_FUNC(fgets);
+DEFINE_ACCMUT_FUNC(fgetc);
+DEFINE_ACCMUT_FUNC(getc);
+DEFINE_ACCMUT_FUNC(ungetc);
+DEFINE_ACCMUT_FUNC(vfscanf);
+DEFINE_ACCMUT_FUNC(fscanf);
+DEFINE_ACCMUT_FUNC(scanf);
+DEFINE_ACCMUT_FUNC(fputs);
+DEFINE_ACCMUT_FUNC(fwrite);
+DEFINE_ACCMUT_FUNC(vfprintf);
+DEFINE_ACCMUT_FUNC(fprintf);
+DEFINE_ACCMUT_FUNC(printf);
+DEFINE_ACCMUT_FUNC(perror);
+
+#define ADD_ACCMUT_FUNC(name) ADD_FUN(_ ## name, name);
 
 #define ALL_ADDED()\
-ADD_FUNC(_print, print_ori);\
-ADD_FUNC(_open, open);\
-ADD_FUNC(_creat, creat);\
-ADD_FUNC(_lseek, lseek);\
-ADD_FUNC(_close, close);\
-ADD_FUNC(_read, read);\
-ADD_FUNC(_write, write);\
-ADD_FUNC(_fopen, fopen);\
-ADD_FUNC(_fclose, fclose);\
-ADD_FUNC(_fputs, fputs);
+ADD_ACCMUT_FUNC(open);\
+ADD_ACCMUT_FUNC(creat);\
+ADD_ACCMUT_FUNC(lseek);\
+ADD_ACCMUT_FUNC(close);\
+ADD_ACCMUT_FUNC(read);\
+ADD_ACCMUT_FUNC(write);\
+ADD_ACCMUT_FUNC(fopen);\
+ADD_ACCMUT_FUNC(fclose);\
+ADD_ACCMUT_FUNC(freopen);\
+ADD_ACCMUT_FUNC(feof);\
+ADD_ACCMUT_FUNC(fileno);\
+ADD_ACCMUT_FUNC(fflush);\
+ADD_ACCMUT_FUNC(ferror);\
+ADD_ACCMUT_FUNC(fseek);\
+ADD_ACCMUT_FUNC(ftell);\
+ADD_ACCMUT_FUNC(fseeko);\
+ADD_ACCMUT_FUNC(ftello);\
+ADD_ACCMUT_FUNC(rewind);\
+ADD_ACCMUT_FUNC(fread);\
+ADD_ACCMUT_FUNC(fgets);\
+ADD_ACCMUT_FUNC(fgetc);\
+ADD_ACCMUT_FUNC(getc);\
+ADD_ACCMUT_FUNC(ungetc);\
+ADD_ACCMUT_FUNC(vfscanf);\
+ADD_ACCMUT_FUNC(fscanf);\
+ADD_ACCMUT_FUNC(scanf);\
+ADD_ACCMUT_FUNC(fputs);\
+ADD_ACCMUT_FUNC(fwrite);\
+ADD_ACCMUT_FUNC(vfprintf);\
+ADD_ACCMUT_FUNC(fprintf);\
+ADD_ACCMUT_FUNC(printf);\
+ADD_ACCMUT_FUNC(perror);
 
 #include "testdef.h"
 
