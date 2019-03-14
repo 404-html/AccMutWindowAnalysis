@@ -239,3 +239,31 @@ TEST(stdio_scanf,
              unlink("test-stdio5.txt");
      )
 )
+
+TEST(stdio_fread_fwrite,
+     RUN(
+             int
+             ret;
+             auto fd = fopen("test-stdio6.txt", "w+");
+             char buf[100];
+             char buf2[100];
+             strcpy(buf, "abcdefghijklmnopqrstx");
+             ret = fwrite(buf, 4, 5, fd);
+             check_eq(ret, 5);
+             rewind(fd);
+             ret = fread(buf2, 4, 5, fd);
+             check_eq(ret, 5);
+             check_mem(buf, buf2, 20);
+
+             fputs("x", fd);
+             rewind(fd);
+             ret = fread(buf2, 4, 10, fd);
+             check_eq(ret, 5);
+             check_mem(buf, buf2, 21);
+             check_samebool(feof(fd), 1);
+             fclose(fd);
+     ),
+     RUN(
+             unlink("test-stdio6.txt");
+     )
+)

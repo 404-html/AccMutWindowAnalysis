@@ -51,7 +51,7 @@ size_t __accmutv2__fdwrite__nosync(int fd, const void *buf, size_t size, size_t 
     ssize_t ret = fdstruct->write(buf, size * nitem);
     if (ret < 0)
         return 0;
-    return (size_t) ret;
+    return (size_t) ret / size;
 }
 
 int __accmutv2__fdgetc__nosync(int fd) {

@@ -238,6 +238,7 @@ int __accmutv2__ungetc(int c, ACCMUTV2_FILE *fp) {
     fp->eof_seen = false;
     int ori_ret = only_origin(::ungetc(c, fp->orifile));
     check_eq(ret, ori_ret);
+    check_samebool(fp->eof_seen, feof(fp->orifile));
     return c;
 }
 
