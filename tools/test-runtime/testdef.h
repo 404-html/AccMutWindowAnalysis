@@ -5,8 +5,6 @@
 #ifndef LLVM_TESTDEF_H
 #define LLVM_TESTDEF_H
 
-#define ADD_FUNC(type, name) type<__test_tplarg> name
-
 #define TEST(__name, __prog, __cleanup) \
 template <int __test_tplarg> \
 struct __name ## _test {\

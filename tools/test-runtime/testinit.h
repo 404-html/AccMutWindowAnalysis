@@ -61,6 +61,7 @@ DEFINE_ACCMUT_FUNC(fprintf);
 DEFINE_ACCMUT_FUNC(printf);
 DEFINE_ACCMUT_FUNC(perror);
 DEFINE_ACCMUT_FUNC(fputc);
+DEFINE_VAR(_stdin, FILE *, ACCMUTV2_FILE *, stdin, accmutv2_stdin);
 
 #define ADD_ACCMUT_FUNC(name) ADD_FUNC(_ ## name, name)
 
@@ -97,7 +98,8 @@ ADD_ACCMUT_FUNC(vfprintf);\
 ADD_ACCMUT_FUNC(fprintf);\
 ADD_ACCMUT_FUNC(printf);\
 ADD_ACCMUT_FUNC(perror);\
-ADD_ACCMUT_FUNC(fputc);
+ADD_ACCMUT_FUNC(fputc);\
+ADD_VAR(_stdin, stdin_file);
 
 #include "testdef.h"
 
