@@ -48,7 +48,7 @@ ssize_t real_file_descriptor::read(void *buf, size_t count) {
 }
 
 ssize_t real_file_descriptor::write(const void *buf, size_t count) {
-    if (flags & O_RDONLY) {
+    if ((flags & O_ACCMODE) == O_RDONLY) {
         errno = EBADF;
         return -1;
     }
