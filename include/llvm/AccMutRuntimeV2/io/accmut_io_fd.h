@@ -40,6 +40,10 @@ public:
 
     virtual int printf(const char *format, va_list ap) = 0;
 
+    virtual bool canread() = 0;
+
+    virtual bool canwrite() = 0;
+
     virtual ~file_descriptor() = default;
 
     inline explicit file_descriptor(int fd, TAG tag) : tag(tag), fd(fd) {};
@@ -74,6 +78,10 @@ public:
     int getc() override;
 
     int printf(const char *format, va_list ap) override;
+
+    bool canread() override;
+
+    bool canwrite() override;
 
     real_file_descriptor(int fd, int flags);
 };
@@ -124,6 +132,14 @@ public:
         return EOF;
     }
 
+    inline bool canread() override {
+        return true;
+    }
+
+    inline bool canwrite() override {
+        return true;
+    }
+
     inline explicit stdin_file_descriptor(int fd) : std_file_descriptor(fd, STDIN_FILE) {};
 };
 
@@ -134,6 +150,14 @@ public:
     int puts(const char *s) override;
 
     int printf(const char *format, va_list ap) override;
+
+    inline bool canread() override {
+        return false;
+    }
+
+    inline bool canwrite() override {
+        return false;
+    }
 
     inline explicit stdout_file_descriptor(int fd) : std_file_descriptor(fd, STDOUT_FILE) {};
 };

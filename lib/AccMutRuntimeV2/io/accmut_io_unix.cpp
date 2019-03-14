@@ -14,16 +14,26 @@ void check_all() {
             continue;
         }
         struct stat sb;
-        if (fstat(fd, &sb) == -1)
-            return;
-        auto buf = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-        if (!buf)
-            return;
-        fprintf(stderr, "Checking %d\n", fd);
-        check_eq(fdmap[fd]->tag, file_descriptor::REAL_FILE);
-        auto rfd = static_cast<real_file_descriptor *>(fdmap[fd]);
-        check_mem(rfd->buffer.data(), buf, sb.st_size);
+        if (fstat(fd, &sb) == -1) {
+            fprintf(stderr, "Can't find file of %d\n", fd);
+            continue;
+        }
+        void *buf;
+        if (fdmap[fd]->canread()) {
+            auto buf = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+            if (buf == MAP_FAILED) {
+                fprintf(stderr, "Can't map the file of %d\n", fd);
+                continue;
+            }
+            fprintf(stderr, "Checking %d\n", fd);
+            check_eq(fdmap[fd]->tag, file_descriptor::REAL_FILE);
+            auto rfd = static_cast<real_file_descriptor *>(fdmap[fd]);
+            check_mem(rfd->buffer.data(), buf, sb.st_size);
+        } else {
+            fprintf(stderr, "Can't read %d\n", fd);
+        }
     }
+    fprintf(stderr, "Finished checking\n");
 }
 
 void dump_text(int fd) {

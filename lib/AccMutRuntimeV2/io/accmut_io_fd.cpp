@@ -147,6 +147,14 @@ int real_file_descriptor::printf(const char *format, va_list ap) {
     return ret;
 }
 
+bool real_file_descriptor::canread() {
+    return (flags & O_ACCMODE) != O_WRONLY;
+}
+
+bool real_file_descriptor::canwrite() {
+    return (flags & O_ACCMODE) != O_RDONLY;
+}
+
 real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(fd, REAL_FILE) {
     this->flags = flags;
     struct stat sb;
