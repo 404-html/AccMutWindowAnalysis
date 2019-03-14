@@ -1,4 +1,4 @@
-add_llvm_library(AccMutRuntimeV2
+add_llvm_library(LLVMAccMutRuntimeV2
         accmut_arith_common.cpp
         accmut_async_sig_safe_string.c
         accmut_config.c
@@ -12,6 +12,7 @@ add_llvm_library(AccMutRuntimeV2
         io/accmut_io_stdio_support.cpp
         io/accmut_io_buf_ori.cpp
         io/accmut_io_scanf.cpp
+        accmut_init_early.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/AccMutRuntimeV2

@@ -122,6 +122,9 @@ int __real_fprintf(FILE *fp, const char *format, ...);
 
 
 /************* ALL EXIT HANDLER ***************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
 void __accmut__exit_check_output();
 
 void __accmut__exit_time();
@@ -141,5 +144,27 @@ void __accmut__load_all_muts();
 
 void __accmut__init();
 
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+
+struct _INIT_ACCMUT {
+    static bool once;
+
+    _INIT_ACCMUT() {
+        if (!once) {
+            TEST_ID = 0;
+            __accmut__init();
+            once = true;
+        }
+    }
+};
+
+#ifdef ACCMUT_START_EARLY
+static _INIT_ACCMUT init;
+#endif
+#endif
 
 #endif
