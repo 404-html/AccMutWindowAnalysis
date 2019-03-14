@@ -5,7 +5,6 @@
 //
 
 #include <stdio.h>
-#include <stdint.h>
 #include <unistd.h>
 
 #include "sys/time.h"
@@ -14,7 +13,6 @@
 
 #include "llvm/AccMutRuntime/accmut_config.h"
 #include "llvm/AccMutRuntime/accmut_exitcode.h"
-#include "llvm/AccMutRuntime/accmut_io_cleanup.h"
 
 extern struct itimerval ACCMUT_PROF_TICK;
 extern struct itimerval ACCMUT_REAL_TICK;
@@ -73,7 +71,6 @@ int32_t goodvar_fork(int mutID) {
             exit(ENV_ERR);
         }
 
-        __accmut__io__close__ori();
 
         // isChild = true
         return 1;

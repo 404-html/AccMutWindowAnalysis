@@ -1,16 +1,12 @@
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/wait.h>
 
 #include <sys/time.h>
 #include <sys/mman.h>
 
 #include "llvm/AccMutRuntime/accmut_process.h"
 #include "llvm/AccMutRuntime/accmut_arith_common.h"
-#include "llvm/AccMutRuntime/accmut_io.h"
-#include "llvm/AccMutRuntime/accmut_io_cleanup.h"
 #include "llvm/AccMutRuntime/accmut_exitcode.h"
 
 
@@ -317,7 +313,6 @@ long __accmut__fork__eqclass(int from, int to) {
             fprintf(stderr, "%d %d\n", TEST_ID, MUTATION_ID);
 #endif
 
-            __accmut__io__close__ori();
 
             return eqclass[i].value;
         } else {
@@ -401,9 +396,6 @@ void __accmut__init() {
     }*/
     default_active_set[0] = 1;
 
-    accmut_stdin->orifile = stdin;
-    accmut_stdout->orifile = stdout;
-    accmut_stderr->orifile = stderr;
 }
 
 void __accmut__register(RegMutInfo *rmi) {
