@@ -5,6 +5,8 @@
 #ifndef LLVM_ACCMUT_IO_STDIO_H
 #define LLVM_ACCMUT_IO_STDIO_H
 
+#include "accmut_io_restrict.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,10 +22,6 @@ typedef struct ACCMUTV2_FILE {
 extern ACCMUTV2_FILE *accmutv2_stdin;
 extern ACCMUTV2_FILE *accmutv2_stdout;
 extern ACCMUTV2_FILE *accmutv2_stderr;
-
-#ifdef __APPLE__
-#define restrict __restrict
-#endif
 
 /** File management **/
 ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode);

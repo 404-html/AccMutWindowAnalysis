@@ -113,7 +113,7 @@ int __accmutv2__open(const char *pathname, int flags, ...) {
     if (flags & O_CREAT) {
         va_list lst;
         va_start(lst, flags);
-        mode_t mode = va_arg(lst, mode_t);
+        int mode = va_arg(lst, int);
         va_end(lst);
         if (MUTATION_ID == 0) {
             fd = open(pathname, flags, mode);
