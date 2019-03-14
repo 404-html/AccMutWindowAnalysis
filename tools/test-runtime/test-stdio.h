@@ -79,3 +79,56 @@ TEST(stdio_positioning,
              unlink("test-stdio1.txt");
      )
 )
+
+TEST(stdio_file_status,
+     RUN(
+             int
+             ret;
+             char *retp;
+             auto fd = fopen("test-stdio2.txt", "w+");
+             char buf[100];
+             ret = fputs("1234567890", fd);
+             check_neq(ret, EOF);
+             ret = feof(fd);
+             check_eq(ret, 0);
+             retp = fgets(buf, 100, fd);
+             ret = feof(fd);
+             check_eq(ret, 1);
+             fclose(fd);
+     ),
+     RUN(
+             unlink("test-stdio2.txt");
+     )
+)
+
+TEST(stdio_unix_interoperate,
+     RUN(
+             int
+             ret;
+             int fd;
+             auto fp = fopen("test-stdio3.txt", "w+");
+             char buf[100];
+             fd = fileno(fp);
+             check_eq(fd, 3);
+             ret = write(fd, "abcd", 4);
+             check_eq(ret, 4);
+             ret = fputs("1234", fp);
+             check_eq(ret, 4);
+             check();
+             rewind(fp);
+             fgets(buf, 100, fp);
+             check_mem(buf, "abcd1234\0", 9);
+             rewind(fp);
+             memset(buf, 0, sizeof(buf));
+             read(fd, buf, 100);
+             check_mem(buf, "abcd1234\0", 9);
+
+             check();
+             ret = fclose(fp);
+             check_eq(ret, 0);
+             check();
+     ),
+     RUN(
+             unlink("test-stdio3.txt");
+     )
+)

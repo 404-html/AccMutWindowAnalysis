@@ -9,5 +9,7 @@ int main() {
     // mkdir("/tmp/accmut_test", 0755);
     chdir("/tmp/accmut_test");
     //unixrunner or1;
-    stdio_positioning_runner for1;
+    // stdio_positioning_runner for1;
+    // stdio_file_status_runner fsr1;
+    stdio_unix_interoperate_runner fuir1;
 }
