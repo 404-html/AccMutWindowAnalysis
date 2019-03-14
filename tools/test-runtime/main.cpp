@@ -2,8 +2,13 @@
 // Created by Sirui Lu on 2019-03-14.
 //
 
-#include "test-open.h"
+#include "test-fopen.h"
+#include "test-unix.h"
 
 int main() {
-    openrunner or1;
+    system("rm -rf /tmp/accmut_test");
+    mkdir("/tmp/accmut_test", 0755);
+    chdir("/tmp/accmut_test");
+    unixrunner or1;
+    // fopenrunner for1;
 }

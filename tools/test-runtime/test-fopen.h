@@ -3,15 +3,15 @@
 //
 #include "testinit.h"
 
-TEST(open,
+TEST(fopen,
      RUN(
              auto
-             fd = fopen("test-open.txt", "w");
+             fd = fopen("test-fopen.txt", "w");
              fputs("abc", fd);
              check();
              fclose(fd);
      ),
      RUN(
-             system("rm -f test-open.txt");
+             system("rm -f test-fopen.txt");
      )
 )

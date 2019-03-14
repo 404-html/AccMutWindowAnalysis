@@ -25,8 +25,8 @@ struct __name ## _test {\
 };\
 struct __name ## runner {\
     inline __name ## runner() {\
-        fprintf(stderr, "Start running test %s\n", #__name);\
-        fprintf(stderr, "Running ori\n");\
+        fprintf(stderr, "---- Start running test %s\n", #__name);\
+        fprintf(stderr, "---- Running ori\n");\
         __name ## _test<0> oritest;\
         pid_t pid = fork();\
         int status;\
@@ -38,8 +38,8 @@ struct __name ## runner {\
         }\
         wait(&status);\
         if (!WIFEXITED(status))\
-            fprintf(stderr, "ori not exited normally\n");\
-        fprintf(stderr, "Running new\n");\
+            fprintf(stderr, "**** ori not exited normally\n");\
+        fprintf(stderr, "---- Running new\n");\
         __name ## _test<1> newtest;\
         pid = fork();\
         if (pid != 0) {\
@@ -49,8 +49,8 @@ struct __name ## runner {\
         }\
         wait(&status);\
         if (!WIFEXITED(status))\
-            fprintf(stderr, "new not exited normally\n");\
-        fprintf(stderr, "Finish running test %s\n", #__name);\
+            fprintf(stderr, "**** new not exited normally\n");\
+        fprintf(stderr, "---- Finish running test %s\n", #__name);\
     }\
 };
 
