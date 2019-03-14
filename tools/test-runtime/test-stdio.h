@@ -289,3 +289,18 @@ TEST(stdio_printf,
              unlink("test-stdio7.txt");
      )
 )
+
+TEST(stdio_freopen,
+     RUN(
+             auto
+             fp = fopen("test-stdio8.txt", "w");
+             fputs("1", fp);
+             fclose(fp);
+             freopen("test-stdio8.txt", "r", stdin_file);
+             int i = 0;
+             scanf("%d", &i);
+     ),
+     RUN(
+             unlink("test-stdio8.txt");
+     )
+)
