@@ -3,7 +3,7 @@
 //
 #include "testinit.h"
 
-TEST(fopen,
+TEST(stdio,
      RUN(
              auto
              fd = fopen("test-fopen.txt", "w");
