@@ -132,3 +132,65 @@ TEST(stdio_unix_interoperate,
              unlink("test-stdio3.txt");
      )
 )
+
+TEST(stdio_input,
+     RUN(
+             int
+             ret;
+             auto fp = fopen("test-stdio4.txt", "w+");
+             char buf[100];
+             ret = fputs("abcdefghijklmnopqrstuvwxyz", fp);
+             check_neq(ret, EOF);
+
+             ret = ungetc('1', fp);
+             check_eq(ret, '1');
+             fgets(buf, 8, fp);
+             check_streq(buf, "1");
+             check();
+
+             rewind(fp);
+             ret = ungetc('1', fp);
+             check_eq(ret, '1');
+             fgets(buf, 8, fp);
+             check_streq(buf, "1abcdef");
+             check();
+
+             rewind(fp);
+             ret = ftell(fp);
+             check_eq(ret, 0);
+             ret = ungetc('1', fp);
+             check_eq(ret, '1');
+             fgets(buf, 8, fp);
+             check_streq(buf, "1abcdef");
+             check();
+
+             rewind(fp);
+             ret = ungetc('1', fp);
+             check_eq(ret, '1');
+             ret = fseek(fp, 0, SEEK_CUR);
+             check_eq(ret, -1);
+             ret = fseek(fp, 0, SEEK_SET);
+             check_eq(ret, 0);
+             fgets(buf, 8, fp);
+             check_streq(buf, "abcdefg");
+             check();
+
+             rewind(fp);
+             ungetc('1', fp);
+             ret = getc(fp);
+             check_eq(ret, '1');
+             ret = getc(fp);
+             check_eq(ret, 'a');
+             ungetc('1', fp);
+             ret = getc(fp);
+             check_eq(ret, '1');
+             ret = getc(fp);
+             check_eq(ret, 'b');
+             check();
+
+             fclose(fp);
+     ),
+     RUN(
+             unlink("test-stdio4.txt");
+     )
+)
