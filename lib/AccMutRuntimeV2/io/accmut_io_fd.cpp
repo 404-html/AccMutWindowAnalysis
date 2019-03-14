@@ -65,7 +65,7 @@ ssize_t real_file_descriptor::write(const void *buf, size_t count) {
     }
 }
 
-char *real_file_descriptor::gets(char *s, int size) {
+char *real_file_descriptor::gets(char *s, int size, int &eof_seen) {
     if (size <= 0)
         return nullptr;
     if (size == 1) {
@@ -74,6 +74,7 @@ char *real_file_descriptor::gets(char *s, int size) {
     }
     if (pos >= this->size) {
         s[0] = 0;
+        eof_seen = true;
         return nullptr;
     }
     int len = std::min(size - 1, (int) (this->size - pos)); // len >= 1
@@ -83,6 +84,9 @@ char *real_file_descriptor::gets(char *s, int size) {
         len = (int) (t - buffer.data() - pos);
         ++t;
         ++len;
+    } else {
+        if (len != size - 1)
+            eof_seen = true;
     }
     memcpy(s, buffer.data() + pos, len);
     pos += len;

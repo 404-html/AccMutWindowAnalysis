@@ -183,18 +183,12 @@ char *__accmutv2__fgets(char *buf, int size, ACCMUTV2_FILE *fp) {
             buf[0] = 0;
             ret = buf;
         } else {
-            if (fp->eof_seen)
-                ret = nullptr;
             if (fp->unget_char != EOF) {
                 buf[0] = fp->unget_char;
                 fp->unget_char = EOF;
-                char *r1 = __accmutv2__fdgets__nosync(fp->fd, buf + 1, size - 1);
-                if (!r1)
-                    fp->eof_seen = true;
+                char *r1 = __accmutv2__fdgets__nosync(fp->fd, buf + 1, size - 1, fp->eof_seen);
             } else {
-                ret = __accmutv2__fdgets__nosync(fp->fd, buf, size);
-                if (!ret)
-                    fp->eof_seen = true;
+                ret = __accmutv2__fdgets__nosync(fp->fd, buf, size, fp->eof_seen);
             }
         }
     }

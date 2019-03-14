@@ -6,13 +6,13 @@
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fd.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_fdmap.h>
 
-char *__accmutv2__fdgets__nosync(int fd, char *s, int size) {
+char *__accmutv2__fdgets__nosync(int fd, char *s, int size, int &eof_seen) {
     file_descriptor *fdstruct = fdmap[fd];
     if (!fdstruct) {
         errno = EBADF;
         return nullptr;
     }
-    return fdstruct->gets(s, size);
+    return fdstruct->gets(s, size, eof_seen);
 }
 
 int __accmutv2__fdputs__nosync(int fd, const char *s) {

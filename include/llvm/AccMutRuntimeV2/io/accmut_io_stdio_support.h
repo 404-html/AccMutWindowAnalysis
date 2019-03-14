@@ -9,7 +9,7 @@
 #include <stdarg.h>
 
 /* Special operations on file descriptors to support stdio (without synchronization) */
-char *__accmutv2__fdgets__nosync(int fd, char *s, int size);
+char *__accmutv2__fdgets__nosync(int fd, char *s, int size, int &eof_seen);
 
 int __accmutv2__fdputs__nosync(int fd, const char *s);
 

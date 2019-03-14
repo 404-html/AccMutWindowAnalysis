@@ -28,7 +28,7 @@ public:
 
     virtual ssize_t write(const void *buf, size_t count) = 0;
 
-    virtual char *gets(char *s, int size) = 0;
+    virtual char *gets(char *s, int size, int &eof_seen) = 0;
 
     virtual int puts(const char *s) = 0;
 
@@ -67,7 +67,7 @@ public:
 
     ssize_t write(const void *buf, size_t count) override;
 
-    char *gets(char *s, int size) override;
+    char *gets(char *s, int size, int &eof_seen) override;
 
     int puts(const char *s) override;
 
@@ -90,7 +90,7 @@ class std_file_descriptor : public file_descriptor {
 public:
     off_t lseek(off_t offset, int whence) override;
 
-    inline char *gets(char *s, int size) override {
+    inline char *gets(char *s, int size, int &eof_seen) override {
         check_assert(false, fprintf(stderr, "gets for std file not implemented"));
         return nullptr;
     }
