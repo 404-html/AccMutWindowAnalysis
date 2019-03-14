@@ -38,7 +38,7 @@ void __accmutv2__dump__bin(int fd);
 
 #define __accmutv2__checkfd() do {\
     if (MUTATION_ID == 0) {\
-        fprintf(stderr, "Check fd at %s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);\
+        __check_fprintf(__check_stderr, "Check fd at %s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);\
         __accmutv2__checkfd_func();\
     }\
 } while (0)

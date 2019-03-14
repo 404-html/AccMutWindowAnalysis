@@ -2,7 +2,7 @@
 // Created by Sirui Lu on 2019-03-14.
 //
 
-#include "test-fopen.h"
+#include "test-stdio.h"
 #include "test-unix.h"
 
 int main() {
@@ -10,5 +10,5 @@ int main() {
     mkdir("/tmp/accmut_test", 0755);
     chdir("/tmp/accmut_test");
     unixrunner or1;
-    // fopenrunner for1;
+    stdiorunner for1;
 }

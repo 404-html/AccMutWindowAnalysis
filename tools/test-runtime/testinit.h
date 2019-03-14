@@ -61,7 +61,7 @@ DEFINE_ACCMUT_FUNC(fprintf);
 DEFINE_ACCMUT_FUNC(printf);
 DEFINE_ACCMUT_FUNC(perror);
 
-#define ADD_ACCMUT_FUNC(name) ADD_FUN(_ ## name, name);
+#define ADD_ACCMUT_FUNC(name) ADD_FUNC(_ ## name, name)
 
 #define ALL_ADDED()\
 ADD_ACCMUT_FUNC(open);\
