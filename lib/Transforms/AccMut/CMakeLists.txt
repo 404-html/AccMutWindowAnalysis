@@ -4,7 +4,8 @@ set(AccMutSourceFiles
         MSInstrumenter.cpp
         MutationGen.cpp
         MutUtil.cpp
-        StatisticsUtils.cpp)
+        StatisticsUtils.cpp
+        RenamePass.cpp)
 
 add_llvm_loadable_module(AccMut
         ${AccMutSourceFiles}

@@ -16,9 +16,6 @@
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -26,24 +23,16 @@
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/RegAllocRegistry.h"
 #include "llvm/CodeGen/SchedulerRegistry.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/ModuleSummaryIndex.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/LTO/LTOBackend.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/Transforms/Coroutines.h"
 #include "llvm/Transforms/IPO.h"
@@ -57,7 +46,7 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
-#include <memory>
+
 using namespace clang;
 using namespace llvm;
 
@@ -88,6 +77,7 @@ using namespace llvm;
 #include "llvm/Transforms/AccMut/WAInstrumenter.h"
 #endif
 
+#include "llvm/Transforms/AccMut/RenamePass.h"
 
 namespace {
 
@@ -817,6 +807,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
     PerModulePasses.add(new AAResultsWrapperPass());
     PerModulePasses.add(new MemoryDependenceWrapperPass());
     PerModulePasses.add(wrapper);
+        PerModulePasses.add(new RenamePass());
   }
 
   std::unique_ptr<raw_fd_ostream> ThinLinkOS;
