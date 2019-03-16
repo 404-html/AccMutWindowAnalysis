@@ -10,6 +10,7 @@
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Verifier.h>
 
 #ifdef __APPLE__
 #define FILE_STRUCT "struct.__sFILE"
@@ -121,7 +122,7 @@ void RenamePass::initFunc() {
         Function *newfunc = Function::Create(
                 dyn_cast<FunctionType>(rename(F.first->getFunctionType())),
                 F.first->getLinkage(),
-                F.first->getName() + "__renamed",
+                "__renamed__" + F.first->getName(),
                 theModule);
         funcmap[F.first] = newfunc;
         newfunc->setAttributes(F.first->getAttributes());
@@ -150,7 +151,7 @@ void RenamePass::renameGlobals() {
         auto newgv = new GlobalVariable(*theModule, rename(basetype),
                                         origv->isConstant(),
                                         origv->getLinkage(), nullptr,
-                                        origv->getName() + "__renamed",
+                                        "__renamed__" + origv->getName(),
                                         origv, origv->getThreadLocalMode());
         gvmap[origv] = newgv;
     }
@@ -496,6 +497,10 @@ void RenamePass::rewriteFunctions() {
                     }
                 }
             }
+        }
+        if (verifyFunction(*newfn, &(llvm::errs()))) {
+            llvm::errs() << "FATAL!!!!!! failed to verify\n";
+            exit(-1);
         }
     }
 }
