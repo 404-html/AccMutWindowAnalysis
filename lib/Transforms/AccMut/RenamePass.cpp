@@ -16,7 +16,6 @@
 #endif
 
 RenamePass::RenamePass() : ModulePass(ID) {
-
 }
 
 bool RenamePass::runOnModule(Module &M) {
@@ -168,7 +167,7 @@ void RenamePass::rewriteFunctions() {
             valmap[&*b1] = &*b2;
         }
         for (BasicBlock &bb : *orifn) {
-            valmap[&bb] = BasicBlock::Create(theModule->getContext());
+            valmap[&bb] = BasicBlock::Create(theModule->getContext(), "");
             for (Instruction &inst : bb) {
                 valmap[&inst] = nullptr;
             }
@@ -241,7 +240,6 @@ void RenamePass::rewriteFunctions() {
                     llvm::errs() << "Can cast\n";
                 if (isa<ConstantExpr>(arg))
                     llvm::errs() << "Can cast constant\n";
-                auto *t = cast<ConstantExpr>(arg);
                 llvm::errs() << "Unknown instr " << *arg << "\n";
                 exit(-1);
             }
@@ -273,7 +271,7 @@ void RenamePass::rewriteFunctions() {
                 return BranchInst::Create(
                         dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]),
                         dyn_cast<BasicBlock>(valmap[binst->getSuccessor(1)]),
-                        binst->getCondition());
+                        rewriteValue(binst->getCondition()));
             }
         };
 
@@ -473,13 +471,32 @@ void RenamePass::rewriteFunctions() {
         }
 
         // rebuild
-        for (auto &bb : *orifn) {
+        for (BasicBlock &bb : *orifn) {
             auto *newbb = dyn_cast<BasicBlock>(valmap[&bb]);
-            newbb->insertInto(newfn);
-            IRBuilder<ConstantFolder, IRBuilderDefaultInserter> builder(newbb);
+            // builder.SetInsertPoint(newbb);
             for (auto &inst : bb) {
                 auto *newinst = dyn_cast<Instruction>(valmap[&inst]);
-                builder.Insert(newinst);
+                // builder.Insert(newinst);
+                newbb->getInstList().push_back(newinst);
+            }
+            newbb->insertInto(newfn);
+        }
+
+        /* relink br */
+        for (BasicBlock &bb : *orifn) {
+            auto *newbb = dyn_cast<BasicBlock>(valmap[&bb]);
+            for (auto &inst : bb) {
+                auto *br = dyn_cast<BranchInst>(&inst);
+                if (br) {
+                    auto *newbr = dyn_cast<BranchInst>(valmap[br]);
+                    if (!newbr) {
+                        llvm::errs() << "Should be br: " << *newbr << "\n";
+                        exit(-1);
+                    }
+                    for (unsigned i = 0; i < br->getNumSuccessors(); ++i) {
+                        newbr->setSuccessor(i, dyn_cast<BasicBlock>(valmap[br->getSuccessor(i)]));
+                    }
+                }
             }
         }
     }
