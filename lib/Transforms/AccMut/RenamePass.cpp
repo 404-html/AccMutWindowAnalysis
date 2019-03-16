@@ -80,8 +80,8 @@ void RenamePass::initSkip() {
               "struct.__sFILEX",
               "struct.__sbuf"};
 #endif
-    toSkip.push_back("struct.Mutation");
-    toSkip.push_back("struct.RegMutInfo");
+    toSkip.emplace_back("struct.Mutation");
+    toSkip.emplace_back("struct.RegMutInfo");
 }
 
 void RenamePass::renameType() {
