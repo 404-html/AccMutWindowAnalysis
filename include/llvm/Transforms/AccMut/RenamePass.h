@@ -38,6 +38,37 @@ private:
     void initSkip();
 
     void initFunc();
+
+private:
+    Value *rewriteValue(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteBranchInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteCallInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteReturnInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteCastInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteUnreachableInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap);
 };
 
 #endif //LLVM_RENAMEPASS_H

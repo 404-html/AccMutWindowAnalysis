@@ -96,7 +96,7 @@ void RenamePass::renameType() {
             continue;
         if (sty->isOpaque())
             continue;
-        tymap[sty] = StructType::create(theModule->getContext(), sty->getName().str() + ".new");
+        tymap[sty] = StructType::create(theModule->getContext(), "__renamed__" + sty->getName().str());
     }
     llvm::errs() << "\n--- RENAMING TYPES ---";
     for (auto *sty : StructTypes) {
@@ -108,7 +108,7 @@ void RenamePass::renameType() {
         for (auto *t : sty->elements()) {
             nsubty.push_back(rename(t));
         }
-        auto *t = theModule->getTypeByName(sty->getName().str() + ".new");
+        auto *t = theModule->getTypeByName("__renamed__" + sty->getName().str());
         t->setBody(nsubty);
         llvm::errs() << "RENAMING\t" << *sty << "\tTO\t" << *t << "\n";
     }
@@ -157,6 +157,276 @@ void RenamePass::renameGlobals() {
     }
 }
 
+Value *RenamePass::rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *bop = dyn_cast<BinaryOperator>(arg);
+    auto *newbop = BinaryOperator::Create(bop->getOpcode(),
+                                          rewriteValue(bop->getOperand(0), valmap),
+                                          rewriteValue(bop->getOperand(1), valmap));
+    if (bop->getOpcode() < 11 || bop->getOpcode() > 28) {
+        llvm::errs() << "Unknown opcode for binary operator " << bop->getOpcode() << "\n";
+        exit(-1);
+    }
+    newbop->copyIRFlags(bop);
+    return newbop;
+};
+
+Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *binst = dyn_cast<BranchInst>(arg);
+    if (binst->isUnconditional()) {
+        return BranchInst::Create(dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]));
+    } else {
+        return BranchInst::Create(
+                dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]),
+                dyn_cast<BasicBlock>(valmap[binst->getSuccessor(1)]),
+                rewriteValue(binst->getCondition(), valmap));
+    }
+};
+
+Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *cinst = dyn_cast<CallInst>(arg);
+    auto *calledFunc = cinst->getCalledFunction();
+    if (calledFunc) {
+        std::vector<Value *> args;
+        for (auto &v : cinst->arg_operands()) {
+            args.push_back(rewriteValue(v, valmap));
+        }
+        auto *newinst = CallInst::Create(funcmap[calledFunc], args);
+        newinst->setAttributes(cinst->getAttributes());
+        newinst->setTailCallKind(cinst->getTailCallKind());
+        return newinst;
+    } else {
+        llvm::errs() << "Indirect call:\t" << cinst << "\n";
+        exit(-1);
+    }
+};
+
+Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *cinst = dyn_cast<CmpInst>(arg);
+    auto *newinst = CmpInst::Create(
+            cinst->getOpcode(),
+            cinst->getPredicate(),
+            rewriteValue(cinst->getOperand(0), valmap),
+            rewriteValue(cinst->getOperand(1), valmap));
+    return newinst;
+};
+
+Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *gepinst = dyn_cast<GetElementPtrInst>(arg);
+    std::vector<Value *> idxList;
+    for (auto &v : gepinst->indices()) {
+        idxList.push_back(rewriteValue(v, valmap));
+    }
+    auto *ptop = rewriteValue(gepinst->getPointerOperand(), valmap);
+    auto *resultTy = rename(gepinst->getSourceElementType());
+    auto *newinst = GetElementPtrInst::Create(
+            resultTy,
+            ptop,
+            idxList
+    );
+    newinst->setIsInBounds(gepinst->isInBounds());
+    return newinst;
+};
+
+Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *phinode = dyn_cast<PHINode>(arg);
+    std::vector<BasicBlock *> bbs;
+    std::vector<Value *> values;
+    for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
+        bbs.push_back(dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)]));
+        values.push_back(rewriteValue(phinode->getIncomingValue(i), valmap));
+    }
+    auto *newinst = PHINode::Create(
+            rename(phinode->getType()),
+            phinode->getNumIncomingValues()
+    );
+    for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
+        newinst->setIncomingBlock(i, bbs[i]);
+        newinst->setIncomingValue(i, values[i]);
+    }
+    return newinst;
+};
+
+Value *RenamePass::rewriteReturnInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *retinst = dyn_cast<ReturnInst>(arg);
+    auto *newinst = ReturnInst::Create(
+            theModule->getContext(),
+            rewriteValue(retinst->getReturnValue(), valmap));
+
+    return newinst;
+};
+
+Value *RenamePass::rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *sinst = dyn_cast<StoreInst>(arg);
+    auto *newinst = new StoreInst(
+            rewriteValue(sinst->getValueOperand(), valmap),
+            rewriteValue(sinst->getPointerOperand(), valmap),
+            sinst->isVolatile(),
+            sinst->getAlignment(),
+            sinst->getOrdering(),
+            sinst->getSyncScopeID()
+    );
+    return newinst;
+};
+
+Value *RenamePass::rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto ainst = dyn_cast<AllocaInst>(arg);
+    auto *newinst = new AllocaInst(
+            rename(ainst->getType()->getElementType()),
+            0,
+            rewriteValue(ainst->getArraySize(), valmap),
+            ainst->getAlignment());
+    return newinst;
+};
+
+Value *RenamePass::rewriteCastInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *cinst = dyn_cast<CastInst>(arg);
+    auto *newinst = CastInst::Create(
+            cinst->getOpcode(),
+            rewriteValue(cinst->getOperand(0), valmap),
+            rename(cinst->getDestTy()));
+    return newinst;
+};
+
+Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto linst = dyn_cast<LoadInst>(arg);
+    auto *newinst = new LoadInst(
+            rename(linst->getType()),
+            rewriteValue(linst->getPointerOperand(), valmap),
+            "",
+            linst->isVolatile(),
+            linst->getAlignment(),
+            linst->getOrdering(),
+            linst->getSyncScopeID()
+    );
+    return newinst;
+};
+
+Value *RenamePass::rewriteUnreachableInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    return arg;
+};
+
+Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *cexpr = dyn_cast<ConstantExpr>(arg);
+    std::vector<Value *> oprewrite;
+
+    for (unsigned i = 0; i < cexpr->getNumOperands(); ++i) {
+        oprewrite.push_back(rewriteValue(cexpr->getOperand(i), valmap));
+    }
+
+    auto *ty = rename(cexpr->getType());
+    if (cexpr->isCast()) {
+        if (oprewrite.size() != 1) {
+            llvm::errs() << "Cast has more than one op: " << *cexpr << "\n";
+            exit(-1);
+        }
+        auto *op = dyn_cast<Constant>(oprewrite[0]);
+        if (!op) {
+            llvm::errs() << "Not a constant: " << *oprewrite[0] << "\n";
+        }
+        return ConstantExpr::getCast(cexpr->getOpcode(), op, ty);
+    }
+
+    switch (cexpr->getOpcode()) {
+        case Instruction::GetElementPtr: {
+            auto *inst = dyn_cast<GetElementPtrInst>(cexpr->getAsInstruction());
+            auto *pty = rename(inst->getSourceElementType());
+            auto *constant = dyn_cast<Constant>(rewriteValue(inst->getPointerOperand(), valmap));
+            if (!constant) {
+                llvm::errs() << "Not a constant for gep constant op: " << *constant << "\n";
+                exit(-1);
+            }
+            std::vector<Constant *> idxList;
+            for (auto &idx : inst->indices()) {
+                auto *t = dyn_cast<Constant>(rewriteValue(idx, valmap));
+                if (!t) {
+                    llvm::errs() << "Not a constant for idx: " << *t << "\n";
+                    exit(-1);
+                }
+                idxList.push_back(t);
+            }
+            bool isInBounds = inst->isInBounds();
+            return ConstantExpr::getGetElementPtr(
+                    pty,
+                    constant,
+                    idxList,
+                    isInBounds
+            );
+        }
+        default:
+            llvm::errs() << "Unknown opcode " << cexpr->getOpcode() << "\n";
+            exit(-1);
+    }
+};
+
+Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap) {
+    if (isa<Function>(arg)) {
+        return funcmap[cast<Function>(arg)];
+    } else {
+        return gvmap[cast<GlobalVariable>(arg)];
+    }
+};
+
+
+Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
+    if (!arg)
+        return nullptr;
+    auto iter = valmap.find(arg);
+    if (iter != valmap.end()) {
+        if (iter->second) {
+            llvm::errs() << "FOUND\t" << *arg << "\tTO\t" << *(iter->second) << "\n";
+            return iter->second;
+        }
+    }
+    llvm::errs() << "REWRTING\t" << *arg << "\n";
+    Value *ret;
+    if (isa<BinaryOperator>(arg)) {
+        ret = rewriteBinaryOperator(arg, valmap);
+    } else if (isa<BranchInst>(arg)) {
+        ret = rewriteBranchInst(arg, valmap);
+    } else if (isa<CallInst>(arg)) {
+        ret = rewriteCallInst(arg, valmap);
+    } else if (isa<CmpInst>(arg)) {
+        ret = rewriteCmpInst(arg, valmap);
+    } else if (isa<GetElementPtrInst>(arg)) {
+        ret = rewriteGetElementPtrInst(arg, valmap);
+    } else if (isa<PHINode>(arg)) {
+        ret = rewritePHINode(arg, valmap);
+    } else if (isa<StoreInst>(arg)) {
+        ret = rewriteStoreInst(arg, valmap);
+    } else if (isa<ReturnInst>(arg)) {
+        ret = rewriteReturnInst(arg, valmap);
+    } else if (isa<AllocaInst>(arg)) {
+        ret = rewriteAllocaInst(arg, valmap);
+    } else if (isa<CastInst>(arg)) {
+        ret = rewriteCastInst(arg, valmap);
+    } else if (isa<LoadInst>(arg)) {
+        ret = rewriteLoadInst(arg, valmap);
+    } else if (isa<UnreachableInst>(arg)) {
+        ret = rewriteUnreachableInst(arg, valmap);
+    } else if (isa<ConstantData>(arg)) {
+        ret = arg;
+    } else if (isa<ConstantExpr>(arg)) {
+        ret = rewriteConstantExpr(arg, valmap);
+    } else if (isa<GlobalObject>(arg)) {
+        ret = rewriteGlobalObject(arg, valmap);
+    } else {
+        if (isa<Operator>(arg))
+            llvm::errs() << "Is a operator\n";
+        llvm::errs() << dyn_cast<Operator>(arg)->getOpcode() << "\n";
+        if (dyn_cast<Instruction>(arg))
+            llvm::errs() << "Can cast\n";
+        if (isa<ConstantExpr>(arg))
+            llvm::errs() << "Can cast constant\n";
+        llvm::errs() << "Unknown instr " << *arg << "\n";
+        exit(-1);
+    }
+    llvm::errs() << "REWROTE\t" << *arg << "\tTO\t" << *ret << "\n";
+    if (iter != valmap.end()) {
+        valmap[arg] = ret;
+    }
+    return ret;
+}
+
 void RenamePass::rewriteFunctions() {
     for (auto &p : funcmap) {
         Function *orifn = p.first;
@@ -174,298 +444,11 @@ void RenamePass::rewriteFunctions() {
             }
         }
 
-        std::function<Value *(Value *)>
-                rewriteValue,
-                rewriteBinaryOperator,
-                rewriteBranchInst,
-                rewriteCallInst,
-                rewriteCmpInst,
-                rewriteGetElementPtrInst,
-                rewritePHINode,
-                rewriteReturnInst,
-                rewriteStoreInst,
-                rewriteAllocaInst,
-                rewriteCastInst,
-                rewriteLoadInst,
-                rewriteUnreachableInst,
-                rewriteConstantExpr,
-                rewriteGlobalObject;
-
-        rewriteValue = [&](Value *arg) -> Value * {
-            if (!arg)
-                return nullptr;
-            auto iter = valmap.find(arg);
-            if (iter != valmap.end()) {
-                if (iter->second) {
-                    llvm::errs() << "FOUND\t" << *arg << "\tTO\t" << *(iter->second) << "\n";
-                    return iter->second;
-                }
-            }
-            llvm::errs() << "REWRTING\t" << *arg << "\n";
-            Value *ret;
-            if (isa<BinaryOperator>(arg)) {
-                ret = rewriteBinaryOperator(arg);
-            } else if (isa<BranchInst>(arg)) {
-                ret = rewriteBranchInst(arg);
-            } else if (isa<CallInst>(arg)) {
-                ret = rewriteCallInst(arg);
-            } else if (isa<CmpInst>(arg)) {
-                ret = rewriteCmpInst(arg);
-            } else if (isa<GetElementPtrInst>(arg)) {
-                ret = rewriteGetElementPtrInst(arg);
-            } else if (isa<PHINode>(arg)) {
-                ret = rewritePHINode(arg);
-            } else if (isa<StoreInst>(arg)) {
-                ret = rewriteStoreInst(arg);
-            } else if (isa<ReturnInst>(arg)) {
-                ret = rewriteReturnInst(arg);
-            } else if (isa<AllocaInst>(arg)) {
-                ret = rewriteAllocaInst(arg);
-            } else if (isa<CastInst>(arg)) {
-                ret = rewriteCastInst(arg);
-            } else if (isa<LoadInst>(arg)) {
-                ret = rewriteLoadInst(arg);
-            } else if (isa<UnreachableInst>(arg)) {
-                ret = rewriteUnreachableInst(arg);
-            } else if (isa<ConstantData>(arg)) {
-                ret = arg;
-            } else if (isa<ConstantExpr>(arg)) {
-                ret = rewriteConstantExpr(arg);
-            } else if (isa<GlobalObject>(arg)) {
-                ret = rewriteGlobalObject(arg);
-            } else {
-                if (isa<Operator>(arg))
-                    llvm::errs() << "Is a operator\n";
-                llvm::errs() << dyn_cast<Operator>(arg)->getOpcode() << "\n";
-                if (dyn_cast<Instruction>(arg))
-                    llvm::errs() << "Can cast\n";
-                if (isa<ConstantExpr>(arg))
-                    llvm::errs() << "Can cast constant\n";
-                llvm::errs() << "Unknown instr " << *arg << "\n";
-                exit(-1);
-            }
-            llvm::errs() << "REWROTE\t" << *arg << "\tTO\t" << *ret << "\n";
-            if (iter != valmap.end()) {
-                valmap[arg] = ret;
-            }
-            return ret;
-        };
-
-        rewriteBinaryOperator = [&](Value *arg) -> Value * {
-            auto *bop = dyn_cast<BinaryOperator>(arg);
-            auto *newbop = BinaryOperator::Create(bop->getOpcode(),
-                                                  rewriteValue(bop->getOperand(0)),
-                                                  rewriteValue(bop->getOperand(1)));
-            if (bop->getOpcode() < 11 || bop->getOpcode() > 28) {
-                llvm::errs() << "Unknown opcode for binary operator " << bop->getOpcode() << "\n";
-                exit(-1);
-            }
-            newbop->copyIRFlags(bop);
-            return newbop;
-        };
-
-        rewriteBranchInst = [&](Value *arg) -> Value * {
-            auto *binst = dyn_cast<BranchInst>(arg);
-            if (binst->isUnconditional()) {
-                return BranchInst::Create(dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]));
-            } else {
-                return BranchInst::Create(
-                        dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]),
-                        dyn_cast<BasicBlock>(valmap[binst->getSuccessor(1)]),
-                        rewriteValue(binst->getCondition()));
-            }
-        };
-
-        rewriteCallInst = [&](Value *arg) -> Value * {
-            auto *cinst = dyn_cast<CallInst>(arg);
-            auto *calledFunc = cinst->getCalledFunction();
-            if (calledFunc) {
-                std::vector<Value *> args;
-                for (auto &v : cinst->arg_operands()) {
-                    args.push_back(rewriteValue(v));
-                }
-                auto *newinst = CallInst::Create(funcmap[calledFunc], args);
-                newinst->setAttributes(cinst->getAttributes());
-                newinst->setTailCallKind(cinst->getTailCallKind());
-                return newinst;
-            } else {
-                llvm::errs() << "Indirect call:\t" << cinst << "\n";
-                exit(-1);
-            }
-        };
-
-        rewriteCmpInst = [&](Value *arg) -> Value * {
-            auto *cinst = dyn_cast<CmpInst>(arg);
-            auto *newinst = CmpInst::Create(
-                    cinst->getOpcode(),
-                    cinst->getPredicate(),
-                    rewriteValue(cinst->getOperand(0)),
-                    rewriteValue(cinst->getOperand(1)));
-            return newinst;
-        };
-
-        rewriteGetElementPtrInst = [&](Value *arg) -> Value * {
-            auto *gepinst = dyn_cast<GetElementPtrInst>(arg);
-            std::vector<Value *> idxList;
-            for (auto &v : gepinst->indices()) {
-                idxList.push_back(rewriteValue(v));
-            }
-            auto *ptop = rewriteValue(gepinst->getPointerOperand());
-            auto *resultTy = rename(gepinst->getSourceElementType());
-            auto *newinst = GetElementPtrInst::Create(
-                    resultTy,
-                    ptop,
-                    idxList
-            );
-            newinst->setIsInBounds(gepinst->isInBounds());
-            return newinst;
-        };
-
-        rewritePHINode = [&](Value *arg) -> Value * {
-            auto *phinode = dyn_cast<PHINode>(arg);
-            std::vector<BasicBlock *> bbs;
-            std::vector<Value *> values;
-            for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
-                bbs.push_back(dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)]));
-                values.push_back(rewriteValue(phinode->getIncomingValue(i)));
-            }
-            auto *newinst = PHINode::Create(
-                    rename(phinode->getType()),
-                    phinode->getNumIncomingValues()
-            );
-            for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
-                newinst->setIncomingBlock(i, bbs[i]);
-                newinst->setIncomingValue(i, values[i]);
-            }
-            return newinst;
-        };
-
-        rewriteReturnInst = [&](Value *arg) -> Value * {
-            auto *retinst = dyn_cast<ReturnInst>(arg);
-            auto *newinst = ReturnInst::Create(
-                    theModule->getContext(),
-                    rewriteValue(retinst->getReturnValue()));
-
-            return newinst;
-        };
-
-        rewriteStoreInst = [&](Value *arg) -> Value * {
-            auto *sinst = dyn_cast<StoreInst>(arg);
-            auto *newinst = new StoreInst(
-                    rewriteValue(sinst->getValueOperand()),
-                    rewriteValue(sinst->getPointerOperand()),
-                    sinst->isVolatile(),
-                    sinst->getAlignment(),
-                    sinst->getOrdering(),
-                    sinst->getSyncScopeID()
-            );
-            return newinst;
-        };
-
-        rewriteAllocaInst = [&](Value *arg) -> Value * {
-            auto ainst = dyn_cast<AllocaInst>(arg);
-            auto *newinst = new AllocaInst(
-                    rename(ainst->getType()->getElementType()),
-                    0,
-                    rewriteValue(ainst->getArraySize()),
-                    ainst->getAlignment());
-            return newinst;
-        };
-
-        rewriteCastInst = [&](Value *arg) -> Value * {
-            auto *cinst = dyn_cast<CastInst>(arg);
-            auto *newinst = CastInst::Create(
-                    cinst->getOpcode(),
-                    rewriteValue(cinst->getOperand(0)),
-                    rename(cinst->getDestTy()));
-            return newinst;
-        };
-
-        rewriteLoadInst = [&](Value *arg) -> Value * {
-            auto linst = dyn_cast<LoadInst>(arg);
-            auto *newinst = new LoadInst(
-                    rename(linst->getType()),
-                    rewriteValue(linst->getPointerOperand()),
-                    "",
-                    linst->isVolatile(),
-                    linst->getAlignment(),
-                    linst->getOrdering(),
-                    linst->getSyncScopeID()
-            );
-            return newinst;
-        };
-
-        rewriteUnreachableInst = [&](Value *arg) -> Value * {
-            return arg;
-        };
-
-        rewriteConstantExpr = [&](Value *arg) -> Value * {
-            auto *cexpr = dyn_cast<ConstantExpr>(arg);
-            std::vector<Value *> oprewrite;
-
-            for (unsigned i = 0; i < cexpr->getNumOperands(); ++i) {
-                oprewrite.push_back(rewriteValue(cexpr->getOperand(i)));
-            }
-
-            auto *ty = rename(cexpr->getType());
-            if (cexpr->isCast()) {
-                if (oprewrite.size() != 1) {
-                    llvm::errs() << "Cast has more than one op: " << *cexpr << "\n";
-                    exit(-1);
-                }
-                auto *op = dyn_cast<Constant>(oprewrite[0]);
-                if (!op) {
-                    llvm::errs() << "Not a constant: " << *oprewrite[0] << "\n";
-                }
-                return ConstantExpr::getCast(cexpr->getOpcode(), op, ty);
-            }
-
-            switch (cexpr->getOpcode()) {
-                case Instruction::GetElementPtr: {
-                    auto *inst = dyn_cast<GetElementPtrInst>(cexpr->getAsInstruction());
-                    auto *pty = rename(inst->getSourceElementType());
-                    auto *constant = dyn_cast<Constant>(rewriteValue(inst->getPointerOperand()));
-                    if (!constant) {
-                        llvm::errs() << "Not a constant for gep constant op: " << *constant << "\n";
-                        exit(-1);
-                    }
-                    std::vector<Constant *> idxList;
-                    for (auto &idx : inst->indices()) {
-                        auto *t = dyn_cast<Constant>(rewriteValue(idx));
-                        if (!t) {
-                            llvm::errs() << "Not a constant for idx: " << *t << "\n";
-                            exit(-1);
-                        }
-                        idxList.push_back(t);
-                    }
-                    bool isInBounds = inst->isInBounds();
-                    return ConstantExpr::getGetElementPtr(
-                            pty,
-                            constant,
-                            idxList,
-                            isInBounds
-                    );
-                }
-                default:
-                    llvm::errs() << "Unknown opcode " << cexpr->getOpcode() << "\n";
-                    exit(-1);
-            }
-        };
-
-        rewriteGlobalObject = [&](Value *arg) -> Value * {
-            if (isa<Function>(arg)) {
-                return funcmap[cast<Function>(arg)];
-            } else {
-                return gvmap[cast<GlobalVariable>(arg)];
-            }
-        };
-
-
         for (BasicBlock &bb : *orifn) {
             valmap[&bb] = BasicBlock::Create(theModule->getContext());
             for (Instruction &inst : bb) {
                 llvm::errs() << "GO INTO\t" << inst << "\n";
-                rewriteValue(&inst);
+                rewriteValue(&inst, valmap);
             }
         }
 
@@ -483,7 +466,6 @@ void RenamePass::rewriteFunctions() {
 
         /* relink br */
         for (BasicBlock &bb : *orifn) {
-            auto *newbb = dyn_cast<BasicBlock>(valmap[&bb]);
             for (auto &inst : bb) {
                 auto *br = dyn_cast<BranchInst>(&inst);
                 if (br) {
