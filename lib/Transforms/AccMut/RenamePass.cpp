@@ -304,7 +304,6 @@ void RenamePass::rewriteFunctions() {
         };
 
         rewriteGetElementPtrInst = [&](Value *arg) -> Value * {
-            llvm::errs() << "!!!" << *arg << "\n";
             auto *gepinst = dyn_cast<GetElementPtrInst>(arg);
             std::vector<Value *> idxList;
             for (auto &v : gepinst->indices()) {
@@ -429,7 +428,6 @@ void RenamePass::rewriteFunctions() {
                         llvm::errs() << "Not a constant for gep constant op: " << *constant << "\n";
                         exit(-1);
                     }
-                    llvm::errs() << "<.>" << *constant << "<.>" << rewriteValue(inst->getPointerOperand()) << "\n";
                     std::vector<Constant *> idxList;
                     for (auto &idx : inst->indices()) {
                         auto *t = dyn_cast<Constant>(rewriteValue(idx));
