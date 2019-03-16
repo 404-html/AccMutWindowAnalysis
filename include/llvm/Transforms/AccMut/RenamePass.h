@@ -25,7 +25,7 @@ private:
 
     void renameGlobals();
 
-    Function *rewriteFunctions();
+    void rewriteFunctions();
 
     Module *theModule;
     StructType *accmut_file_ty;
