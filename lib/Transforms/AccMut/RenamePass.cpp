@@ -401,11 +401,41 @@ Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &v
     llvm::errs() << "GlobalObject\n";
     if (isa<Function>(arg)) {
         return funcmap[cast<Function>(arg)];
-    } else {
+    } else if (isa<GlobalVariable>(arg)) {
+        llvm::errs() << *arg << "\n";
         return gvmap[cast<GlobalVariable>(arg)];
+    } else {
+        llvm::errs() << "FUCK" << "\n";
+        exit(-1);
     }
 };
 
+Value *RenamePass::rewriteConstantData(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "ConstantData\n";
+    llvm::errs() << *arg << "\n";
+    if (isa<ConstantPointerNull>(arg)) {
+        auto *cpn = cast<ConstantPointerNull>(arg);
+        auto *ty = dyn_cast<PointerType>(rename(cpn->getType()));
+        return ConstantPointerNull::get(ty);
+    } else {
+        return arg;
+    }
+};
+
+Value *RenamePass::rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "Switch\n";
+    auto *sinst = dyn_cast<SwitchInst>(arg);
+    auto *newinst = SwitchInst::Create(
+            rewriteValue(sinst->getCondition(), valmap),
+            cast<BasicBlock>(valmap[sinst->case_default()->getCaseSuccessor()]),
+            sinst->getNumCases());
+    for (auto t = sinst->case_begin();
+         t != sinst->case_end();
+         ++t) {
+        newinst->addCase(t->getCaseValue(), cast<BasicBlock>(valmap[t->getCaseSuccessor()]));
+    }
+    return newinst;
+}
 
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
     llvm::errs() << "Value\n";
@@ -434,6 +464,8 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         ret = rewritePHINode(arg, valmap);
     } else if (isa<StoreInst>(arg)) {
         ret = rewriteStoreInst(arg, valmap);
+    } else if (isa<SwitchInst>(arg)) {
+        ret = rewriteSwitchInst(arg, valmap);
     } else if (isa<ReturnInst>(arg)) {
         ret = rewriteReturnInst(arg, valmap);
     } else if (isa<AllocaInst>(arg)) {
@@ -445,7 +477,7 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
     } else if (isa<UnreachableInst>(arg)) {
         ret = new UnreachableInst(theModule->getContext());
     } else if (isa<ConstantData>(arg)) {
-        ret = arg;
+        ret = rewriteConstantData(arg, valmap);
     } else if (isa<ConstantExpr>(arg)) {
         ret = rewriteConstantExpr(arg, valmap);
     } else if (isa<GlobalObject>(arg)) {
@@ -510,7 +542,8 @@ void RenamePass::rewriteFunctions() {
         }
         llvm::errs() << "After rebuild\n";
 
-        /* relink br */
+        /* relink BasicBlocks */
+        // Don't modify, it's magic....
         for (BasicBlock &bb : *orifn) {
             for (auto &inst : bb) {
                 auto *br = dyn_cast<BranchInst>(&inst);
@@ -540,6 +573,20 @@ void RenamePass::rewriteFunctions() {
                         newinst->addIncoming(values[i], bbs[i]);
                     }
                 }*/
+
+                auto *switchinst = dyn_cast<SwitchInst>(&inst);
+                if (switchinst) {
+                    auto newinst = dyn_cast<SwitchInst>(valmap[switchinst]);
+                    newinst->setDefaultDest(dyn_cast<BasicBlock>(valmap[switchinst->getDefaultDest()]));
+                    for (auto t = switchinst->case_begin(), n = newinst->case_begin();
+                         t != switchinst->case_end() && n != newinst->case_end();
+                         ++t, ++n) {
+                        llvm::errs() << *(t->getCaseSuccessor()) << "\n";
+                        llvm::errs() << *(valmap[t->getCaseSuccessor()]) << "\n";
+                        n->setSuccessor(cast<BasicBlock>(valmap[t->getCaseSuccessor()]));
+                        n->setValue(t->getCaseValue());
+                    }
+                }
             }
         }
         if (verifyFunction(*newfn, &(llvm::errs()))) {
@@ -624,12 +671,12 @@ void RenamePass::renameBack() {
         f.first->replaceAllUsesWith(UndefValue::get(f.first->getType()));
         f.first->removeFromParent();
 #ifdef __APPLE__
-            if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
-                f.second->setName("__accmutv2__" + f.first->getName());
-            else if (accmut_catched_func_mac_alias.find(f.first->getName()) != accmut_catched_func_mac_alias.end())
-                f.second->setName("__accmutv2__" + f.first->getName().substr(2));
-            else
-                f.second->setName(f.first->getName());
+        if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
+            f.second->setName("__accmutv2__" + f.first->getName());
+        else if (accmut_catched_func_mac_alias.find(f.first->getName()) != accmut_catched_func_mac_alias.end())
+            f.second->setName("__accmutv2__" + f.first->getName().substr(2));
+        else
+            f.second->setName(f.first->getName());
 #else
 #endif
         f.first->dropAllReferences();

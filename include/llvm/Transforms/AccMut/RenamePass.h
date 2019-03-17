@@ -71,6 +71,10 @@ private:
     Value *rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap);
 
     Value *rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteConstantData(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &valmap);
 };
 
 #endif //LLVM_RENAMEPASS_H
