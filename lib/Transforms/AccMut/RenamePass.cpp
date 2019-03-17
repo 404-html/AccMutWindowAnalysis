@@ -264,22 +264,21 @@ Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value 
 Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap) {
     llvm::errs() << "PHINode\n";
     auto *phinode = dyn_cast<PHINode>(arg);
+    /*
     std::vector<BasicBlock *> bbs;
     std::vector<Value *> values;
     for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
         bbs.push_back(dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)]));
         values.push_back(rewriteValue(phinode->getIncomingValue(i), valmap));
-    }
+    }*/
     auto *newinst = PHINode::Create(
             rename(phinode->getType()),
             phinode->getNumIncomingValues()
     );
+    /*
     for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
         newinst->addIncoming(values[i], bbs[i]);
-        /*
-        newinst->setIncomingBlock(i, bbs[i]);
-        newinst->setIncomingValue(i, values[i]);*/
-    }
+    }*/
     return newinst;
 };
 
@@ -557,6 +556,7 @@ void RenamePass::rewriteFunctions() {
 
         /* relink BasicBlocks */
         // Don't modify, it's magic....
+        // very important to break the dependency loop
         for (BasicBlock &bb : *orifn) {
             for (auto &inst : bb) {
                 auto *br = dyn_cast<BranchInst>(&inst);
@@ -570,7 +570,7 @@ void RenamePass::rewriteFunctions() {
                         newbr->setSuccessor(i, dyn_cast<BasicBlock>(valmap[br->getSuccessor(i)]));
                     }
                 }
-                /*
+
                 auto *phinode = dyn_cast<PHINode>(&inst);
                 if (phinode) {
                     std::vector<BasicBlock *> bbs;
@@ -585,7 +585,7 @@ void RenamePass::rewriteFunctions() {
                     for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
                         newinst->addIncoming(values[i], bbs[i]);
                     }
-                }*/
+                }
 
                 auto *switchinst = dyn_cast<SwitchInst>(&inst);
                 if (switchinst) {
