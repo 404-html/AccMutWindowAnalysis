@@ -6,6 +6,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/TypeFinder.h>
 #include <stack>
+#include <set>
 #include <llvm/IR/Operator.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
@@ -42,6 +43,8 @@ bool RenamePass::runOnModule(Module &M) {
     renameGlobals();
     initFunc();
     rewriteFunctions();
+    rewriteGlobalInitalizers();
+    renameBack();
     return true;
 }
 
@@ -127,6 +130,7 @@ void RenamePass::initFunc() {
         funcmap[F.first] = newfunc;
         newfunc->setAttributes(F.first->getAttributes());
         newfunc->setCallingConv(F.first->getCallingConv());
+        newfunc->copyAttributesFrom(F.first);
     }
 }
 
@@ -153,6 +157,7 @@ void RenamePass::renameGlobals() {
                                         origv->getLinkage(), nullptr,
                                         "__renamed__" + origv->getName(),
                                         origv, origv->getThreadLocalMode());
+        newgv->setAttributes(origv->getAttributes());
         gvmap[origv] = newgv;
     }
 }
@@ -483,6 +488,83 @@ void RenamePass::rewriteFunctions() {
         if (verifyFunction(*newfn, &(llvm::errs()))) {
             llvm::errs() << "FATAL!!!!!! failed to verify\n";
             exit(-1);
+        }
+    }
+}
+
+void RenamePass::rewriteGlobalInitalizers() {
+    std::map<Value *, Value *> dummy;
+    for (auto &gv : gvmap) {
+        auto *origv = gv.first;
+        auto *newgv = gv.second;
+        newgv->copyAttributesFrom(origv);
+        if (origv->hasInitializer()) {
+            newgv->setInitializer(dyn_cast<Constant>(rewriteValue(origv->getInitializer(), dummy)));
+        }
+    }
+}
+
+void RenamePass::renameBack() {
+    for (auto &gv : gvmap) {
+        if (gv.second->getName().startswith("__renamed__")) {
+            gv.first->removeFromParent();
+            gv.second->setName(gv.first->getName());
+        }
+    }
+#ifdef __APPLE__
+    std::set<StringRef> accmut_catched_func{
+            "fclose",
+            "feof",
+            "fileno",
+            "fflush",
+            "ferror",
+            "fseek",
+            "ftell",
+            "fseeko",
+            "ftello",
+            "rewind",
+            "fread",
+            "fgets",
+            "fgetc",
+            "getc",
+            "ungetc",
+            "vfscanf",
+            "fscanf",
+            "scanf",
+            "fputc",
+            "vfprintf",
+            "fprintf",
+            "printf",
+            "perror",
+            "lseek",
+    };
+
+    std::set<StringRef> accmut_catched_func_mac_alias{
+            "\01_fopen",
+            "\01_fputs",
+            "\01_freopen",
+            "\01_fputs",
+            "\01_fwrite",
+            "\01_open",
+            "\01_creat",
+            "\01_close",
+            "\01_read",
+            "\01_write"
+    };
+#else
+#endif
+    for (auto &f : funcmap) {
+        if (f.second->getName().startswith("__renamed__")) {
+            f.first->removeFromParent();
+#ifdef __APPLE__
+            if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
+                f.second->setName("__accmutv2__" + f.first->getName());
+            else if (accmut_catched_func_mac_alias.find(f.first->getName()) != accmut_catched_func_mac_alias.end())
+                f.second->setName("__accmutv2__" + f.first->getName().substr(2));
+            else
+                f.second->setName(f.first->getName());
+#else
+#endif
         }
     }
 }

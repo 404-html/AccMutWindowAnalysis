@@ -27,6 +27,10 @@ private:
 
     void rewriteFunctions();
 
+    void rewriteGlobalInitalizers();
+
+    void renameBack();
+
     Module *theModule;
     StructType *accmut_file_ty;
     StructType *file_ty;
