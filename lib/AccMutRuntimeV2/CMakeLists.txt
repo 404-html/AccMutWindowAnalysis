@@ -14,6 +14,7 @@ add_llvm_library(LLVMAccMutRuntimeV2
         io/accmut_io_scanf.cpp
         io/accmut_io_check.cpp
         io/accmut_io_init.cpp
+        io/accmut_io_static_typechecking.cpp
         accmut_init_early.cpp
 
         ADDITIONAL_HEADER_DIRS

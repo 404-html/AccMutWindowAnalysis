@@ -6,6 +6,7 @@
 #define LLVM_ACCMUT_IO_STDIO_H
 
 #include "accmut_io_restrict.h"
+#include "stdio.h"
 
 #ifdef __cplusplus
 extern "C" {
