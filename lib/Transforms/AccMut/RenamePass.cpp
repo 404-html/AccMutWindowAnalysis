@@ -45,6 +45,10 @@ bool RenamePass::runOnModule(Module &M) {
     rewriteFunctions();
     rewriteGlobalInitalizers();
     renameBack();
+    if (verifyModule(M, &(llvm::errs()))) {
+        llvm::errs() << "FATAL!!!!!! failed to verify\n";
+        exit(-1);
+    }
     return true;
 }
 
