@@ -186,6 +186,7 @@ void RenamePass::renameGlobals() {
 }
 
 Value *RenamePass::rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "BinaryOperator\n";
     auto *bop = dyn_cast<BinaryOperator>(arg);
     auto *newbop = BinaryOperator::Create(bop->getOpcode(),
                                           rewriteValue(bop->getOperand(0), valmap),
@@ -199,6 +200,7 @@ Value *RenamePass::rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> 
 };
 
 Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "BranchInst\n";
     auto *binst = dyn_cast<BranchInst>(arg);
     if (binst->isUnconditional()) {
         return BranchInst::Create(dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]));
@@ -211,6 +213,7 @@ Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "CallInst\n";
     auto *cinst = dyn_cast<CallInst>(arg);
     auto *calledFunc = cinst->getCalledFunction();
 
@@ -230,6 +233,7 @@ Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "CmpInst\n";
     auto *cinst = dyn_cast<CmpInst>(arg);
     auto *newinst = CmpInst::Create(
             cinst->getOpcode(),
@@ -240,6 +244,7 @@ Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap
 };
 
 Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "GetElementPtrInst\n";
     auto *gepinst = dyn_cast<GetElementPtrInst>(arg);
     std::vector<Value *> idxList;
     for (auto &v : gepinst->indices()) {
@@ -257,6 +262,7 @@ Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value 
 };
 
 Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "PHINode\n";
     auto *phinode = dyn_cast<PHINode>(arg);
     std::vector<BasicBlock *> bbs;
     std::vector<Value *> values;
@@ -278,6 +284,7 @@ Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap
 };
 
 Value *RenamePass::rewriteReturnInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "ReturnInst\n";
     auto *retinst = dyn_cast<ReturnInst>(arg);
     auto *newinst = ReturnInst::Create(
             theModule->getContext(),
@@ -287,6 +294,7 @@ Value *RenamePass::rewriteReturnInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "StoreInst\n";
     auto *sinst = dyn_cast<StoreInst>(arg);
     auto *newinst = new StoreInst(
             rewriteValue(sinst->getValueOperand(), valmap),
@@ -300,6 +308,7 @@ Value *RenamePass::rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valm
 };
 
 Value *RenamePass::rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "AllocaInst\n";
     auto ainst = dyn_cast<AllocaInst>(arg);
     auto *newinst = new AllocaInst(
             rename(ainst->getType()->getElementType()),
@@ -310,6 +319,7 @@ Value *RenamePass::rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteCastInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "CastInst\n";
     auto *cinst = dyn_cast<CastInst>(arg);
     auto *newinst = CastInst::Create(
             cinst->getOpcode(),
@@ -319,6 +329,7 @@ Value *RenamePass::rewriteCastInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "LoadInst\n";
     auto linst = dyn_cast<LoadInst>(arg);
     auto *newinst = new LoadInst(
             rename(linst->getType()),
@@ -333,6 +344,7 @@ Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "ConstantExpr\n";
     auto *cexpr = dyn_cast<ConstantExpr>(arg);
     std::vector<Value *> oprewrite;
 
@@ -386,6 +398,7 @@ Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &v
 };
 
 Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "GlobalObject\n";
     if (isa<Function>(arg)) {
         return funcmap[cast<Function>(arg)];
     } else {
@@ -395,7 +408,7 @@ Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &v
 
 
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
-    llvm::errs() << "GO INTO\n";
+    llvm::errs() << "Value\n";
     if (!arg)
         return nullptr;
     auto iter = valmap.find(arg);
