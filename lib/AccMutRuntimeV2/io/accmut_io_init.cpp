@@ -13,7 +13,16 @@ void init_stdfile(ACCMUTV2_FILE **fp, int fd, const char *mode) {
     *fp = new ACCMUTV2_FILE();
     (*fp)->fd = fd;
     if (isatty(fd)) {
-        (*fp)->orifile = nullptr;
+        switch (fd) {
+            case 0:
+                (*fp)->orifile = stdin;
+                break;
+            case 1:
+                (*fp)->orifile = stdout;
+                break;
+            case 2:
+                (*fp)->orifile = stderr;
+        }
     } else {
         (*fp)->orifile = fdopen(fd, mode);
     }
