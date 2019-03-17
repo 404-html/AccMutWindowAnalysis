@@ -437,6 +437,17 @@ Value *RenamePass::rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &val
     return newinst;
 }
 
+Value *RenamePass::rewriteSelectInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "Select\n";
+    auto *sinst = dyn_cast<SelectInst>(arg);
+    auto *newinst = SelectInst::Create(
+            rewriteValue(sinst->getCondition(), valmap),
+            rewriteValue(sinst->getTrueValue(), valmap),
+            rewriteValue(sinst->getFalseValue(), valmap)
+    );
+    return newinst;
+}
+
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
     llvm::errs() << "Value\n";
     if (!arg)
@@ -466,6 +477,8 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         ret = rewriteStoreInst(arg, valmap);
     } else if (isa<SwitchInst>(arg)) {
         ret = rewriteSwitchInst(arg, valmap);
+    } else if (isa<SelectInst>(arg)) {
+        ret = rewriteSelectInst(arg, valmap);
     } else if (isa<ReturnInst>(arg)) {
         ret = rewriteReturnInst(arg, valmap);
     } else if (isa<AllocaInst>(arg)) {
