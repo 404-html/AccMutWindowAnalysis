@@ -57,7 +57,11 @@ Type *RenamePass::rename(Type *ty) {
     } else if (isa<IntegerType>(ty)) {
         return ty;
     } else if (isa<VectorType>(ty)) {
-        return ty;
+        auto *at = dyn_cast<VectorType>(ty);
+        return VectorType::get(rename(at->getElementType()), at->getNumElements());
+    } else if (isa<ArrayType>(ty)) {
+        auto *at = dyn_cast<ArrayType>(ty);
+        return ArrayType::get(rename(at->getElementType()), at->getNumElements());
     } else if (isa<PointerType>(ty)) {
         auto *pt = dyn_cast<PointerType>(ty);
         return PointerType::getUnqual(rename(pt->getElementType()));
