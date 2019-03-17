@@ -167,10 +167,6 @@ void RenamePass::renameGlobals() {
 #endif
         GlobalVariable *newgv;
         auto iter = stdfiles.find(origv->getName());
-        FILE *f = fopen("abc", "a");
-        fputs(origv->getName().data(), f);
-        fputs("\n", f);
-        fclose(f);
         if (iter != stdfiles.end()) {
             newgv = new GlobalVariable(*theModule, rename(basetype),
                                        origv->isConstant(),
