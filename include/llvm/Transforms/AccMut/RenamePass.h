@@ -68,8 +68,6 @@ private:
 
     Value *rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valmap);
 
-    Value *rewriteUnreachableInst(Value *arg, std::map<Value *, Value *> &valmap);
-
     Value *rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap);
 
     Value *rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap);

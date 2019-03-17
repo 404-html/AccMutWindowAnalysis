@@ -118,19 +118,20 @@ void RenamePass::renameType() {
 }
 
 void RenamePass::initFunc() {
+    std::vector<Function *> vec;
     for (Function &F : *theModule) {
-        funcmap[&F] = nullptr;
+        vec.push_back(&F);
     }
-    for (auto &F : funcmap) {
+    for (auto &F : vec) {
         Function *newfunc = Function::Create(
-                dyn_cast<FunctionType>(rename(F.first->getFunctionType())),
-                F.first->getLinkage(),
-                "__renamed__" + F.first->getName(),
+                dyn_cast<FunctionType>(rename(F->getFunctionType())),
+                F->getLinkage(),
+                "__renamed__" + F->getName(),
                 theModule);
-        funcmap[F.first] = newfunc;
-        newfunc->setAttributes(F.first->getAttributes());
-        newfunc->setCallingConv(F.first->getCallingConv());
-        newfunc->copyAttributesFrom(F.first);
+        funcmap[F] = newfunc;
+        newfunc->setAttributes(F->getAttributes());
+        newfunc->setCallingConv(F->getCallingConv());
+        newfunc->copyAttributesFrom(F);
     }
 }
 
@@ -152,11 +153,33 @@ void RenamePass::renameGlobals() {
             exit(-1);
         }
         auto *basetype = type->getElementType();
-        auto newgv = new GlobalVariable(*theModule, rename(basetype),
-                                        origv->isConstant(),
-                                        origv->getLinkage(), nullptr,
-                                        "__renamed__" + origv->getName(),
-                                        origv, origv->getThreadLocalMode());
+#ifdef __APPLE__
+        std::map<StringRef, StringRef> stdfiles{
+                {"__stdinp",  "accmutv2_stdin"},
+                {"__stdoutp", "accmutv2_stdout"},
+                {"__stderrp", "accmutv2_stderr"}
+        };
+#else
+#endif
+        GlobalVariable *newgv;
+        auto iter = stdfiles.find(origv->getName());
+        FILE *f = fopen("abc", "a");
+        fputs(origv->getName().data(), f);
+        fputs("\n", f);
+        fclose(f);
+        if (iter != stdfiles.end()) {
+            newgv = new GlobalVariable(*theModule, rename(basetype),
+                                       origv->isConstant(),
+                                       origv->getLinkage(), nullptr,
+                                       iter->second,
+                                       origv, origv->getThreadLocalMode());
+        } else {
+            newgv = new GlobalVariable(*theModule, rename(basetype),
+                                       origv->isConstant(),
+                                       origv->getLinkage(), nullptr,
+                                       "__renamed__" + origv->getName(),
+                                       origv, origv->getThreadLocalMode());
+        }
         newgv->setAttributes(origv->getAttributes());
         gvmap[origv] = newgv;
     }
@@ -190,19 +213,20 @@ Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &val
 Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valmap) {
     auto *cinst = dyn_cast<CallInst>(arg);
     auto *calledFunc = cinst->getCalledFunction();
-    if (calledFunc) {
-        std::vector<Value *> args;
-        for (auto &v : cinst->arg_operands()) {
-            args.push_back(rewriteValue(v, valmap));
-        }
-        auto *newinst = CallInst::Create(funcmap[calledFunc], args);
-        newinst->setAttributes(cinst->getAttributes());
-        newinst->setTailCallKind(cinst->getTailCallKind());
-        return newinst;
-    } else {
-        llvm::errs() << "Indirect call:\t" << cinst << "\n";
-        exit(-1);
+
+    std::vector<Value *> args;
+    for (auto &v : cinst->arg_operands()) {
+        args.push_back(rewriteValue(v, valmap));
     }
+    CallInst *newinst;
+    if (calledFunc) {
+        newinst = CallInst::Create(funcmap[calledFunc], args);
+    } else {
+        newinst = CallInst::Create(rewriteValue(cinst->getCalledValue(), valmap), args);
+    }
+    newinst->setAttributes(cinst->getAttributes());
+    newinst->setTailCallKind(cinst->getTailCallKind());
+    return newinst;
 };
 
 Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap) {
@@ -245,8 +269,10 @@ Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap
             phinode->getNumIncomingValues()
     );
     for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
+        newinst->addIncoming(values[i], bbs[i]);
+        /*
         newinst->setIncomingBlock(i, bbs[i]);
-        newinst->setIncomingValue(i, values[i]);
+        newinst->setIncomingValue(i, values[i]);*/
     }
     return newinst;
 };
@@ -304,10 +330,6 @@ Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valma
             linst->getSyncScopeID()
     );
     return newinst;
-};
-
-Value *RenamePass::rewriteUnreachableInst(Value *arg, std::map<Value *, Value *> &valmap) {
-    return arg;
 };
 
 Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap) {
@@ -373,6 +395,7 @@ Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &v
 
 
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
+    llvm::errs() << "GO INTO\n";
     if (!arg)
         return nullptr;
     auto iter = valmap.find(arg);
@@ -407,7 +430,7 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
     } else if (isa<LoadInst>(arg)) {
         ret = rewriteLoadInst(arg, valmap);
     } else if (isa<UnreachableInst>(arg)) {
-        ret = rewriteUnreachableInst(arg, valmap);
+        ret = new UnreachableInst(theModule->getContext());
     } else if (isa<ConstantData>(arg)) {
         ret = arg;
     } else if (isa<ConstantExpr>(arg)) {
@@ -415,9 +438,11 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
     } else if (isa<GlobalObject>(arg)) {
         ret = rewriteGlobalObject(arg, valmap);
     } else {
-        if (isa<Operator>(arg))
+        llvm::errs() << "Unknown\n";
+        if (isa<Operator>(arg)) {
             llvm::errs() << "Is a operator\n";
-        llvm::errs() << dyn_cast<Operator>(arg)->getOpcode() << "\n";
+            llvm::errs() << dyn_cast<Operator>(arg)->getOpcode() << "\n";
+        }
         if (dyn_cast<Instruction>(arg))
             llvm::errs() << "Can cast\n";
         if (isa<ConstantExpr>(arg))
@@ -457,6 +482,7 @@ void RenamePass::rewriteFunctions() {
             }
         }
 
+        llvm::errs() << "Before rebuild\n";
         // rebuild
         for (BasicBlock &bb : *orifn) {
             auto *newbb = dyn_cast<BasicBlock>(valmap[&bb]);
@@ -464,10 +490,12 @@ void RenamePass::rewriteFunctions() {
             for (auto &inst : bb) {
                 auto *newinst = dyn_cast<Instruction>(valmap[&inst]);
                 // builder.Insert(newinst);
+                llvm::errs() << *valmap[&inst] << "\n";
                 newbb->getInstList().push_back(newinst);
             }
             newbb->insertInto(newfn);
         }
+        llvm::errs() << "After rebuild\n";
 
         /* relink br */
         for (BasicBlock &bb : *orifn) {
@@ -483,10 +511,28 @@ void RenamePass::rewriteFunctions() {
                         newbr->setSuccessor(i, dyn_cast<BasicBlock>(valmap[br->getSuccessor(i)]));
                     }
                 }
+                /*
+                auto *phinode = dyn_cast<PHINode>(&inst);
+                if (phinode) {
+                    std::vector<BasicBlock *> bbs;
+                    std::vector<Value *> values;
+                    for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
+                        bbs.push_back(dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)]));
+                        llvm::errs() << dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)]) << "\n";
+                        llvm::errs() << *(dyn_cast<BasicBlock>(valmap[phinode->getIncomingBlock(i)])) << "\n";
+                        values.push_back(rewriteValue(phinode->getIncomingValue(i), valmap));
+                    }
+                    auto newinst = dyn_cast<PHINode>(valmap[phinode]);
+                    for (unsigned i = 0; i < phinode->getNumIncomingValues(); ++i) {
+                        newinst->addIncoming(values[i], bbs[i]);
+                    }
+                }*/
             }
         }
         if (verifyFunction(*newfn, &(llvm::errs()))) {
             llvm::errs() << "FATAL!!!!!! failed to verify\n";
+            llvm::errs() << *orifn << "\n";
+            llvm::errs() << *newfn << "\n";
             exit(-1);
         }
     }
@@ -499,6 +545,10 @@ void RenamePass::rewriteGlobalInitalizers() {
         auto *newgv = gv.second;
         newgv->copyAttributesFrom(origv);
         if (origv->hasInitializer()) {
+            if (newgv->getName().startswith("accmutv2")) {
+                llvm::errs() << "stdfiles should not have an initializer\n";
+                exit(-1);
+            }
             newgv->setInitializer(dyn_cast<Constant>(rewriteValue(origv->getInitializer(), dummy)));
         }
     }
@@ -506,10 +556,12 @@ void RenamePass::rewriteGlobalInitalizers() {
 
 void RenamePass::renameBack() {
     for (auto &gv : gvmap) {
-        if (gv.second->getName().startswith("__renamed__")) {
-            gv.first->removeFromParent();
+        gv.first->replaceAllUsesWith(UndefValue::get(gv.first->getType()));
+        gv.first->removeFromParent();
+        if (gv.second->getName().startswith("__renamed__"))
             gv.second->setName(gv.first->getName());
-        }
+        gv.first->setInitializer(nullptr);
+        gv.first->dropAllReferences();
     }
 #ifdef __APPLE__
     std::set<StringRef> accmut_catched_func{
@@ -554,8 +606,10 @@ void RenamePass::renameBack() {
 #else
 #endif
     for (auto &f : funcmap) {
-        if (f.second->getName().startswith("__renamed__")) {
-            f.first->removeFromParent();
+        // if (f.second->getName().startswith("__renamed__")) {
+
+        f.first->replaceAllUsesWith(UndefValue::get(f.first->getType()));
+        f.first->removeFromParent();
 #ifdef __APPLE__
             if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
                 f.second->setName("__accmutv2__" + f.first->getName());
@@ -565,7 +619,11 @@ void RenamePass::renameBack() {
                 f.second->setName(f.first->getName());
 #else
 #endif
-        }
+        f.first->dropAllReferences();
+        /*} else {
+            llvm::errs() << "Unknown function name?" << f.second->getName() << "\n";
+            exit(-1);
+        }*/
     }
 }
 
