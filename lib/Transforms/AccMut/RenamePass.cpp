@@ -767,7 +767,7 @@ void RenamePass::renameBack() {
         gv.first->setInitializer(nullptr);
         gv.first->dropAllReferences();
     }
-    std::set<StringRef> accmut_catched_func{
+    std::set<std::string> accmut_catched_func{
             "fclose",
             "feof",
             "fileno",
@@ -806,9 +806,10 @@ void RenamePass::renameBack() {
 
 
 #ifdef __APPLE__
-    std::set<StringRef> accmut_catched_func_mac_alias;
+    std::set<std::string> accmut_catched_func_mac_alias;
     for (auto &s : accmut_catched_func) {
-        accmut_catched_func_mac_alias.insert(("\01_" + s).str());
+        accmut_catched_func_mac_alias.insert("\01_" + s);
+        llvm::errs() << "\01_" + s << "\n";
     }
 #endif
     for (auto &f : funcmap) {
@@ -816,6 +817,7 @@ void RenamePass::renameBack() {
 
         f.first->replaceAllUsesWith(UndefValue::get(f.first->getType()));
         f.first->removeFromParent();
+        llvm::errs() << "RENAMING\t" << f.second->getName();
         if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
             f.second->setName("__accmutv2__" + f.first->getName());
 #ifdef __APPLE__
@@ -824,6 +826,7 @@ void RenamePass::renameBack() {
 #endif
         else
             f.second->setName(f.first->getName());
+        llvm::errs() << "\tTO\t" << f.second->getName() << "\n";
         f.first->dropAllReferences();
         /*} else {
             llvm::errs() << "Unknown function name?" << f.second->getName() << "\n";
