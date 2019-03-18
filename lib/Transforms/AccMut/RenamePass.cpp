@@ -350,10 +350,10 @@ Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valma
 Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap) {
     llvm::errs() << "ConstantExpr\n";
     auto *cexpr = dyn_cast<ConstantExpr>(arg);
-    std::vector<Value *> oprewrite;
+    std::vector<Constant *> oprewrite;
 
     for (unsigned i = 0; i < cexpr->getNumOperands(); ++i) {
-        oprewrite.push_back(rewriteValue(cexpr->getOperand(i), valmap));
+        oprewrite.push_back(dyn_cast<Constant>(rewriteValue(cexpr->getOperand(i), valmap)));
     }
 
     auto *ty = rename(cexpr->getType());
@@ -362,11 +362,29 @@ Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &v
             llvm::errs() << "Cast has more than one op: " << *cexpr << "\n";
             exit(-1);
         }
-        auto *op = dyn_cast<Constant>(oprewrite[0]);
+        auto *op = oprewrite[0];
         if (!op) {
             llvm::errs() << "Not a constant: " << *oprewrite[0] << "\n";
         }
         return ConstantExpr::getCast(cexpr->getOpcode(), op, ty);
+    }
+
+    if (cexpr->getOpcode() >= 11 && cexpr->getOpcode() <= 28) {
+        if (oprewrite.size() != 2) {
+            llvm::errs() << "Binary operations don't have 2 ops: " << *cexpr << "\n";
+            exit(-1);
+        }
+        auto *obo = dyn_cast<OverflowingBinaryOperator>(cexpr);
+        unsigned flag = 0;
+        if (obo) {
+            flag |= (obo->hasNoUnsignedWrap() ? OverflowingBinaryOperator::NoUnsignedWrap : 0);
+            flag |= (obo->hasNoSignedWrap() ? OverflowingBinaryOperator::NoSignedWrap : 0);
+        }
+        auto *pie = dyn_cast<PossiblyExactOperator>(cexpr);
+        if (pie) {
+            flag |= (pie->isExact() ? PossiblyExactOperator::IsExact : 0);
+        }
+        return ConstantExpr::get(cexpr->getOpcode(), oprewrite[0], oprewrite[1], flag);
     }
 
     switch (cexpr->getOpcode()) {
