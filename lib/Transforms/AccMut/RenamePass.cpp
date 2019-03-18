@@ -792,36 +792,38 @@ void RenamePass::renameBack() {
             "printf",
             "perror",
             "lseek",
+            "fopen",
+            "fputs",
+            "freopen",
+            "fputs",
+            "fwrite",
+            "open",
+            "creat",
+            "close",
+            "read",
+            "write"
     };
 
-    std::set<StringRef> accmut_catched_func_mac_alias{
-            "\01_fopen",
-            "\01_fputs",
-            "\01_freopen",
-            "\01_fputs",
-            "\01_fwrite",
-            "\01_open",
-            "\01_creat",
-            "\01_close",
-            "\01_read",
-            "\01_write"
-    };
-#else
+
+#ifdef __APPLE__
+    std::set<StringRef> accmut_catched_func_mac_alias;
+    for (auto &s : accmut_catched_func) {
+        accmut_catched_func_mac_alias.insert(("\01_" + s).str());
+    }
 #endif
     for (auto &f : funcmap) {
         // if (f.second->getName().startswith("__renamed__")) {
 
         f.first->replaceAllUsesWith(UndefValue::get(f.first->getType()));
         f.first->removeFromParent();
-#ifdef __APPLE__
         if (accmut_catched_func.find(f.first->getName()) != accmut_catched_func.end())
             f.second->setName("__accmutv2__" + f.first->getName());
+#ifdef __APPLE__
         else if (accmut_catched_func_mac_alias.find(f.first->getName()) != accmut_catched_func_mac_alias.end())
             f.second->setName("__accmutv2__" + f.first->getName().substr(2));
+#endif
         else
             f.second->setName(f.first->getName());
-#else
-#endif
         f.first->dropAllReferences();
         /*} else {
             llvm::errs() << "Unknown function name?" << f.second->getName() << "\n";
