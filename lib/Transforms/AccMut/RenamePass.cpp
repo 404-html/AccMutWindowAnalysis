@@ -12,16 +12,29 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Verifier.h>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #define FILE_STRUCT "struct.__sFILE"
 #endif
+
+static void printIR(Module &M, const char *suffix) {
+    std::string ir;
+    raw_string_ostream os(ir);
+    os << M;
+    os.flush();
+    FILE *f = fopen((std::string(M.getName()) + suffix).c_str(), "w");
+    fputs(ir.c_str(), f);
+    fclose(f);
+}
 
 RenamePass::RenamePass() : ModulePass(ID) {
 }
 
 bool RenamePass::runOnModule(Module &M) {
     theModule = &M;
+    printIR(M, ".ori.ll");
+
     accmut_file_ty = theModule->getTypeByName("struct.ACCMUTV2_FILE");
     file_ty = theModule->getTypeByName(FILE_STRUCT);
     if (!file_ty) {
@@ -45,10 +58,12 @@ bool RenamePass::runOnModule(Module &M) {
     rewriteFunctions();
     rewriteGlobalInitalizers();
     renameBack();
+    llvm::errs() << M.getName() << "\n";
     if (verifyModule(M, &(llvm::errs()))) {
         llvm::errs() << "FATAL!!!!!! failed to verify\n";
         exit(-1);
     }
+    printIR(M, ".new.ll");
     return true;
 }
 
