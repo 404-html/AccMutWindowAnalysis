@@ -186,6 +186,7 @@ void RenamePass::renameGlobals() {
         }
         newgv->setAttributes(origv->getAttributes());
         gvmap[origv] = newgv;
+        llvm::errs() << "RENAMING GLOBAL\t" << *origv << "\tTO\t" << *newgv << "\n";
     }
 }
 
@@ -420,6 +421,110 @@ Value *RenamePass::rewriteConstantData(Value *arg, std::map<Value *, Value *> &v
         auto *cpn = cast<ConstantPointerNull>(arg);
         auto *ty = dyn_cast<PointerType>(rename(cpn->getType()));
         return ConstantPointerNull::get(ty);
+    } else if (isa<ConstantAggregateZero>(arg)) {
+        return ConstantAggregateZero::get(rename(arg->getType()));
+    } else if (isa<ConstantDataArray>(arg)) {
+        auto *cda = cast<ConstantDataArray>(arg);
+        auto *elety = cda->getElementType();
+        if (elety->isFloatTy()) {
+            std::vector<float> vec;
+            for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                vec.push_back(cda->getElementAsFloat(i));
+            }
+            return ConstantDataArray::get(theModule->getContext(), vec);
+        } else if (elety->isDoubleTy()) {
+            std::vector<double> vec;
+            for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                vec.push_back(cda->getElementAsDouble(i));
+            }
+            return ConstantDataArray::get(theModule->getContext(), vec);
+        } else {
+            auto *intty = cast<IntegerType>(elety);
+            switch (intty->getBitWidth()) {
+                case 8: {
+                    std::vector<uint8_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint8_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataArray::get(theModule->getContext(), vec);
+                }
+                case 16: {
+                    std::vector<uint16_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint16_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataArray::get(theModule->getContext(), vec);
+                }
+                case 32: {
+                    std::vector<uint32_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint32_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataArray::get(theModule->getContext(), vec);
+                }
+                case 64: {
+                    std::vector<uint64_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint64_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataArray::get(theModule->getContext(), vec);
+                }
+                default:
+                    llvm::errs() << "Unsupported bit width: " << intty->getBitWidth() << "\n";
+                    exit(-1);
+            }
+        }
+    } else if (isa<ConstantDataVector>(arg)) {
+        auto *cda = cast<ConstantDataVector>(arg);
+        auto *elety = cda->getElementType();
+        if (elety->isFloatTy()) {
+            std::vector<float> vec;
+            for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                vec.push_back(cda->getElementAsFloat(i));
+            }
+            return ConstantDataVector::get(theModule->getContext(), vec);
+        } else if (elety->isDoubleTy()) {
+            std::vector<double> vec;
+            for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                vec.push_back(cda->getElementAsDouble(i));
+            }
+            return ConstantDataVector::get(theModule->getContext(), vec);
+        } else {
+            auto *intty = cast<IntegerType>(elety);
+            switch (intty->getBitWidth()) {
+                case 8: {
+                    std::vector<uint8_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint8_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataVector::get(theModule->getContext(), vec);
+                }
+                case 16: {
+                    std::vector<uint16_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint16_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataVector::get(theModule->getContext(), vec);
+                }
+                case 32: {
+                    std::vector<uint32_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint32_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataVector::get(theModule->getContext(), vec);
+                }
+                case 64: {
+                    std::vector<uint64_t> vec;
+                    for (unsigned i = 0; i < cda->getNumElements(); ++i) {
+                        vec.push_back((uint64_t) cda->getElementAsInteger(i));
+                    }
+                    return ConstantDataVector::get(theModule->getContext(), vec);
+                }
+                default:
+                    llvm::errs() << "Unsupported bit width: " << intty->getBitWidth() << "\n";
+                    exit(-1);
+            }
+        }
     } else {
         return arg;
     }
@@ -449,6 +554,20 @@ Value *RenamePass::rewriteSelectInst(Value *arg, std::map<Value *, Value *> &val
             rewriteValue(sinst->getFalseValue(), valmap)
     );
     return newinst;
+}
+
+Value *RenamePass::rewriteConstantAggregate(Value *arg, std::map<Value *, Value *> &valmap) {
+    std::vector<Constant *> retvec;
+    for (auto &t : dyn_cast<User>(arg)->operands()) {
+        retvec.push_back(dyn_cast<Constant>(rewriteValue(dyn_cast<Value>(&t), valmap)));
+    }
+    if (isa<ConstantVector>(arg)) {
+        return ConstantVector::get(retvec);
+    } else if (isa<ConstantArray>(arg)) {
+        return ConstantArray::get(dyn_cast<ArrayType>(rename(dyn_cast<ConstantArray>(arg)->getType())), retvec);
+    } else {
+        return ConstantStruct::get(dyn_cast<StructType>(rename(dyn_cast<ConstantStruct>(arg)->getType())), retvec);
+    }
 }
 
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
@@ -498,6 +617,8 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         ret = rewriteConstantExpr(arg, valmap);
     } else if (isa<GlobalObject>(arg)) {
         ret = rewriteGlobalObject(arg, valmap);
+    } else if (isa<ConstantAggregate>(arg)) {
+        ret = rewriteConstantAggregate(arg, valmap);
     } else {
         llvm::errs() << "Unknown\n";
         if (isa<Operator>(arg)) {
@@ -626,7 +747,13 @@ void RenamePass::rewriteGlobalInitalizers() {
                 llvm::errs() << "stdfiles should not have an initializer\n";
                 exit(-1);
             }
+            llvm::errs() << "REWRITE INIT FOR\t" << *newgv << "\n";
+            llvm::errs() << "ORIGINAL\t" << *(origv->getInitializer()) << "\n";
+            llvm::errs() << "NEW\t" << *rewriteValue(origv->getInitializer(), dummy) << "\n";
             newgv->setInitializer(dyn_cast<Constant>(rewriteValue(origv->getInitializer(), dummy)));
+        } else {
+            llvm::errs() << "NO INIT: " << *origv << "\n";
+            llvm::errs() << "NO INIT(new): " << *newgv << "\n";
         }
     }
 }
@@ -640,7 +767,6 @@ void RenamePass::renameBack() {
         gv.first->setInitializer(nullptr);
         gv.first->dropAllReferences();
     }
-#ifdef __APPLE__
     std::set<StringRef> accmut_catched_func{
             "fclose",
             "feof",

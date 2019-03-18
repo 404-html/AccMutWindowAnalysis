@@ -77,6 +77,8 @@ private:
     Value *rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &valmap);
 
     Value *rewriteSelectInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteConstantAggregate(Value *arg, std::map<Value *, Value *> &valmap);
 };
 
 #endif //LLVM_RENAMEPASS_H
