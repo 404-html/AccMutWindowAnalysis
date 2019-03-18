@@ -525,6 +525,8 @@ Value *RenamePass::rewriteConstantData(Value *arg, std::map<Value *, Value *> &v
                     exit(-1);
             }
         }
+    } else if (isa<UndefValue>(arg)) {
+        return UndefValue::get(rename(arg->getType()));
     } else {
         return arg;
     }
