@@ -78,6 +78,12 @@ private:
 
     Value *rewriteSelectInst(Value *arg, std::map<Value *, Value *> &valmap);
 
+    Value *rewriteShuffleVectorInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteInsertElementInst(Value *arg, std::map<Value *, Value *> &valmap);
+
+    Value *rewriteExtractElementInst(Value *arg, std::map<Value *, Value *> &valmap);
+
     Value *rewriteConstantAggregate(Value *arg, std::map<Value *, Value *> &valmap);
 };
 

@@ -572,6 +572,31 @@ Value *RenamePass::rewriteConstantAggregate(Value *arg, std::map<Value *, Value 
     }
 }
 
+Value *RenamePass::rewriteShuffleVectorInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *svi = dyn_cast<ShuffleVectorInst>(arg);
+    return new ShuffleVectorInst(
+            rewriteValue(svi->getOperand(0), valmap),
+            rewriteValue(svi->getOperand(1), valmap),
+            rewriteValue(svi->getMask(), valmap));
+}
+
+Value *RenamePass::rewriteInsertElementInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *iei = dyn_cast<InsertElementInst>(arg);
+    return InsertElementInst::Create(
+            rewriteValue(iei->getOperand(0), valmap),
+            rewriteValue(iei->getOperand(1), valmap),
+            rewriteValue(iei->getOperand(2), valmap)
+    );
+}
+
+Value *RenamePass::rewriteExtractElementInst(Value *arg, std::map<Value *, Value *> &valmap) {
+    auto *eei = dyn_cast<ExtractElementInst>(arg);
+    return ExtractElementInst::Create(
+            rewriteValue(eei->getVectorOperand(), valmap),
+            rewriteValue(eei->getIndexOperand(), valmap)
+    );
+}
+
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
     llvm::errs() << "Value\n";
     if (!arg)
@@ -593,8 +618,12 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         ret = rewriteCallInst(arg, valmap);
     } else if (isa<CmpInst>(arg)) {
         ret = rewriteCmpInst(arg, valmap);
+    } else if (isa<ExtractElementInst>(arg)) {
+        ret = rewriteExtractElementInst(arg, valmap);
     } else if (isa<GetElementPtrInst>(arg)) {
         ret = rewriteGetElementPtrInst(arg, valmap);
+    } else if (isa<InsertElementInst>(arg)) {
+        ret = rewriteInsertElementInst(arg, valmap);
     } else if (isa<PHINode>(arg)) {
         ret = rewritePHINode(arg, valmap);
     } else if (isa<StoreInst>(arg)) {
@@ -603,6 +632,8 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         ret = rewriteSwitchInst(arg, valmap);
     } else if (isa<SelectInst>(arg)) {
         ret = rewriteSelectInst(arg, valmap);
+    } else if (isa<ShuffleVectorInst>(arg)) {
+        ret = rewriteShuffleVectorInst(arg, valmap);
     } else if (isa<ReturnInst>(arg)) {
         ret = rewriteReturnInst(arg, valmap);
     } else if (isa<AllocaInst>(arg)) {
