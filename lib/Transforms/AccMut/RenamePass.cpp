@@ -3,6 +3,7 @@
 //
 
 #include <llvm/Transforms/AccMut/RenamePass.h>
+#include <llvm/Transforms/AccMut/printIR.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/TypeFinder.h>
 #include <stack>
@@ -17,16 +18,6 @@
 #ifdef __APPLE__
 #define FILE_STRUCT "struct.__sFILE"
 #endif
-
-static void printIR(Module &M, const char *suffix) {
-    std::string ir;
-    raw_string_ostream os(ir);
-    os << M;
-    os.flush();
-    FILE *f = fopen((std::string(M.getName()) + suffix).c_str(), "w");
-    fputs(ir.c_str(), f);
-    fclose(f);
-}
 
 RenamePass::RenamePass() : ModulePass(ID) {
 }
@@ -249,6 +240,7 @@ Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valma
     }
     newinst->setAttributes(cinst->getAttributes());
     newinst->setTailCallKind(cinst->getTailCallKind());
+    newinst->setCallingConv(cinst->getCallingConv());
     return newinst;
 };
 
@@ -902,4 +894,4 @@ void RenamePass::renameBack() {
 }
 
 char RenamePass::ID = 0;
-static RegisterPass<RenamePass> X("AccMut-instrument", "AccMut - Rename FILE");
+static RegisterPass<RenamePass> X("AccMut-RenamePass", "AccMut - Rename FILE");
