@@ -52,7 +52,7 @@ using namespace llvm;
 
 // AccMut - added by Tang Xianghao
 #include "llvm/Transforms/AccMut/Config.h"
-
+/*
 //SWITCH FOR IR-LEVEL MUTATION GENERATION
 #if ACCMUT_GEN_MUT
 #include "llvm/Transforms/AccMut/MutationGen.h"
@@ -76,6 +76,14 @@ using namespace llvm;
 #if ACCMUT_WINDOW_ANALYSIS_INSTRUMENT
 #include "llvm/Transforms/AccMut/WAInstrumenter.h"
 #endif
+ */
+
+#include "llvm/Transforms/AccMut/MutationGen.h"
+#include "llvm/Transforms/AccMut/StatisticsUtils.h"
+#include "llvm/Transforms/AccMut/MSInstrumenter.h"
+#include "llvm/Transforms/AccMut/DMAInstrumenter.h"
+#include "llvm/Transforms/AccMut/WAInstrumenter.h"
+#include "llvm/Transforms/AccMut/PrintPass.h"
 
 #include "llvm/Transforms/AccMut/RenamePass.h"
 
@@ -774,7 +782,32 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
   // workPass should execute at the end of optimization, before emitting LL or BC
   {
     PrettyStackTraceString CrashInfo("AccMut work passes");
-
+    if (ACCMUT_MODE_SELECT != 0) {
+        PerModulePasses.add(new PrintPass(".ll"));
+      PerModulePasses.add(new MutationGen());
+      PerModulePasses.add(new AAResultsWrapperPass());
+      PerModulePasses.add(new MemoryDependenceWrapperPass());
+      switch(ACCMUT_MODE_SELECT) {
+          case ACCMUT_GEN_MUT:
+            break;
+          case ACCMUT_MUTATION_SCHEMATA:
+            PerModulePasses.add(new FunctionPassToModulePassWrapper(new MSInstrumenter()));
+            break;
+          case ACCMUT_DYNAMIC_ANALYSIS_INSTRUMENT:
+            PerModulePasses.add(new DMAInstrumenter());
+            break;
+          case ACCMUT_STATISTICS_INSTRUEMENT:
+            PerModulePasses.add(new FunctionPassToModulePassWrapper(new ExecInstNums()));
+            break;
+          case ACCMUT_WINDOW_ANALYSIS_INSTRUMENT:
+            PerModulePasses.add(new WAInstrumenter());
+            break;
+          default:
+            break;
+      }
+      PerModulePasses.add(new RenamePass());
+    }
+    /*
     FunctionPass *workPass;
     ModulePass *wrapper;
 
@@ -808,6 +841,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
     PerModulePasses.add(new MemoryDependenceWrapperPass());
     PerModulePasses.add(wrapper);
         PerModulePasses.add(new RenamePass());
+        */
   }
 
   std::unique_ptr<raw_fd_ostream> ThinLinkOS;
