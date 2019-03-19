@@ -84,6 +84,7 @@ using namespace llvm;
 #include "llvm/Transforms/AccMut/DMAInstrumenter.h"
 #include "llvm/Transforms/AccMut/WAInstrumenter.h"
 #include "llvm/Transforms/AccMut/PrintPass.h"
+#include "llvm/Transforms/AccMut/InstrumentMainPass.h"
 
 #include "llvm/Transforms/AccMut/RenamePass.h"
 
@@ -806,6 +807,8 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
             break;
       }
       PerModulePasses.add(new RenamePass());
+      PerModulePasses.add(new InstrumentMainPass());
+      PerModulePasses.add(new PrintPass(".final.ll"));
     }
     /*
     FunctionPass *workPass;
