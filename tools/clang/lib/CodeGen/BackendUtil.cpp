@@ -86,8 +86,6 @@ using namespace llvm;
 #include "llvm/Transforms/AccMut/PrintPass.h"
 #include "llvm/Transforms/AccMut/InstrumentMainPass.h"
 
-#include "llvm/Transforms/AccMut/RenamePass.h"
-
 namespace {
 
 // Default filename used for profile generation.
@@ -783,6 +781,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
   // workPass should execute at the end of optimization, before emitting LL or BC
   {
     PrettyStackTraceString CrashInfo("AccMut work passes");
+      llvm::errs() << "???\n";
     if (ACCMUT_MODE_SELECT != 0) {
         PerModulePasses.add(new PrintPass(".ll"));
       PerModulePasses.add(new MutationGen());
@@ -806,7 +805,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
           default:
             break;
       }
-      PerModulePasses.add(new RenamePass());
+        // PerModulePasses.add(new UglyRenamePass());
       PerModulePasses.add(new InstrumentMainPass());
       PerModulePasses.add(new PrintPass(".final.ll"));
     }

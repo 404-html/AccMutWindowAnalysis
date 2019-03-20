@@ -7,7 +7,8 @@ set(AccMutSourceFiles
         StatisticsUtils.cpp
         PrintPass.cpp
         InstrumentMainPass.cpp
-        RenamePass.cpp)
+        RenamePass.cpp
+        UglyRenamePass.cpp)
 
 add_llvm_loadable_module(AccMut
         ${AccMutSourceFiles}
