@@ -19,6 +19,8 @@
 #define FILE_STRUCT "struct.__sFILE"
 #endif
 
+#define NOINSTLOG
+
 RenamePass::RenamePass() : ModulePass(ID) {
 }
 
@@ -197,7 +199,9 @@ void RenamePass::renameGlobals() {
 }
 
 Value *RenamePass::rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "BinaryOperator\n";
+#endif
     auto *bop = dyn_cast<BinaryOperator>(arg);
     auto *newbop = BinaryOperator::Create(bop->getOpcode(),
                                           rewriteValue(bop->getOperand(0), valmap),
@@ -211,7 +215,9 @@ Value *RenamePass::rewriteBinaryOperator(Value *arg, std::map<Value *, Value *> 
 };
 
 Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "BranchInst\n";
+#endif
     auto *binst = dyn_cast<BranchInst>(arg);
     if (binst->isUnconditional()) {
         return BranchInst::Create(dyn_cast<BasicBlock>(valmap[binst->getSuccessor(0)]));
@@ -224,7 +230,9 @@ Value *RenamePass::rewriteBranchInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "CallInst\n";
+#endif
     auto *cinst = dyn_cast<CallInst>(arg);
     auto *calledFunc = cinst->getCalledFunction();
 
@@ -245,7 +253,9 @@ Value *RenamePass::rewriteCallInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "CmpInst\n";
+#endif
     auto *cinst = dyn_cast<CmpInst>(arg);
     auto *newinst = CmpInst::Create(
             cinst->getOpcode(),
@@ -256,7 +266,9 @@ Value *RenamePass::rewriteCmpInst(Value *arg, std::map<Value *, Value *> &valmap
 };
 
 Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "GetElementPtrInst\n";
+#endif
     auto *gepinst = dyn_cast<GetElementPtrInst>(arg);
     std::vector<Value *> idxList;
     for (auto &v : gepinst->indices()) {
@@ -274,7 +286,9 @@ Value *RenamePass::rewriteGetElementPtrInst(Value *arg, std::map<Value *, Value 
 };
 
 Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "PHINode\n";
+#endif
     auto *phinode = dyn_cast<PHINode>(arg);
     /*
     std::vector<BasicBlock *> bbs;
@@ -295,7 +309,9 @@ Value *RenamePass::rewritePHINode(Value *arg, std::map<Value *, Value *> &valmap
 };
 
 Value *RenamePass::rewriteReturnInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "ReturnInst\n";
+#endif
     auto *retinst = dyn_cast<ReturnInst>(arg);
     auto *newinst = ReturnInst::Create(
             theModule->getContext(),
@@ -305,7 +321,9 @@ Value *RenamePass::rewriteReturnInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "StoreInst\n";
+#endif
     auto *sinst = dyn_cast<StoreInst>(arg);
     auto *newinst = new StoreInst(
             rewriteValue(sinst->getValueOperand(), valmap),
@@ -319,7 +337,9 @@ Value *RenamePass::rewriteStoreInst(Value *arg, std::map<Value *, Value *> &valm
 };
 
 Value *RenamePass::rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "AllocaInst\n";
+#endif
     auto ainst = dyn_cast<AllocaInst>(arg);
     auto *newinst = new AllocaInst(
             rename(ainst->getType()->getElementType()),
@@ -330,7 +350,9 @@ Value *RenamePass::rewriteAllocaInst(Value *arg, std::map<Value *, Value *> &val
 };
 
 Value *RenamePass::rewriteCastInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "CastInst\n";
+#endif
     auto *cinst = dyn_cast<CastInst>(arg);
     auto *newinst = CastInst::Create(
             cinst->getOpcode(),
@@ -340,7 +362,9 @@ Value *RenamePass::rewriteCastInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "LoadInst\n";
+#endif
     auto linst = dyn_cast<LoadInst>(arg);
     auto *newinst = new LoadInst(
             rename(linst->getType()),
@@ -355,7 +379,9 @@ Value *RenamePass::rewriteLoadInst(Value *arg, std::map<Value *, Value *> &valma
 };
 
 Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "ConstantExpr\n";
+#endif
     auto *cexpr = dyn_cast<ConstantExpr>(arg);
     std::vector<Constant *> oprewrite;
 
@@ -427,7 +453,9 @@ Value *RenamePass::rewriteConstantExpr(Value *arg, std::map<Value *, Value *> &v
 };
 
 Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "GlobalObject\n";
+#endif
     if (isa<Function>(arg)) {
         return funcmap[cast<Function>(arg)];
     } else if (isa<GlobalVariable>(arg)) {
@@ -440,8 +468,10 @@ Value *RenamePass::rewriteGlobalObject(Value *arg, std::map<Value *, Value *> &v
 };
 
 Value *RenamePass::rewriteConstantData(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "ConstantData\n";
     llvm::errs() << *arg << "\n";
+#endif
     if (isa<ConstantPointerNull>(arg)) {
         auto *cpn = cast<ConstantPointerNull>(arg);
         auto *ty = dyn_cast<PointerType>(rename(cpn->getType()));
@@ -558,7 +588,9 @@ Value *RenamePass::rewriteConstantData(Value *arg, std::map<Value *, Value *> &v
 };
 
 Value *RenamePass::rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "Switch\n";
+#endif
     auto *sinst = dyn_cast<SwitchInst>(arg);
     auto *newinst = SwitchInst::Create(
             rewriteValue(sinst->getCondition(), valmap),
@@ -573,7 +605,9 @@ Value *RenamePass::rewriteSwitchInst(Value *arg, std::map<Value *, Value *> &val
 }
 
 Value *RenamePass::rewriteSelectInst(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "Select\n";
+#endif
     auto *sinst = dyn_cast<SelectInst>(arg);
     auto *newinst = SelectInst::Create(
             rewriteValue(sinst->getCondition(), valmap),
@@ -623,7 +657,9 @@ Value *RenamePass::rewriteExtractElementInst(Value *arg, std::map<Value *, Value
 }
 
 Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) {
+#ifndef NOINSTLOG
     llvm::errs() << "Value\n";
+#endif
     if (!arg)
         return nullptr;
     auto iter = valmap.find(arg);
@@ -633,7 +669,9 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
             return iter->second;
         }
     }
+#ifndef NOINSTLOG
     llvm::errs() << "REWRTING\t" << *arg << "\n";
+#endif
     Value *ret;
     if (isa<BinaryOperator>(arg)) {
         ret = rewriteBinaryOperator(arg, valmap);
@@ -690,7 +728,9 @@ Value *RenamePass::rewriteValue(Value *arg, std::map<Value *, Value *> &valmap) 
         llvm::errs() << "Unknown instr " << *arg << "\n";
         exit(-1);
     }
+#ifndef NOINSTLOG
     llvm::errs() << "REWROTE\t" << *arg << "\tTO\t" << *ret << "\n";
+#endif
     if (iter != valmap.end()) {
         valmap[arg] = ret;
     }
@@ -701,6 +741,7 @@ void RenamePass::rewriteFunctions() {
     for (auto &p : funcmap) {
         Function *orifn = p.first;
         Function *newfn = p.second;
+        llvm::errs() << "Rewriting\t" << orifn->getName() << "\n";
         if (p.first->isDeclaration())
             continue;
         std::map<Value *, Value *> valmap;
@@ -722,7 +763,9 @@ void RenamePass::rewriteFunctions() {
             }
         }
 
+#ifndef NOINSTLOG
         llvm::errs() << "Before rebuild\n";
+#endif
         // rebuild
         for (BasicBlock &bb : *orifn) {
             auto *newbb = dyn_cast<BasicBlock>(valmap[&bb]);
@@ -730,12 +773,16 @@ void RenamePass::rewriteFunctions() {
             for (auto &inst : bb) {
                 auto *newinst = dyn_cast<Instruction>(valmap[&inst]);
                 // builder.Insert(newinst);
+#ifndef NOINSTLOG
                 llvm::errs() << *valmap[&inst] << "\n";
+#endif
                 newbb->getInstList().push_back(newinst);
             }
             newbb->insertInto(newfn);
         }
+#ifndef NOINSTLOG
         llvm::errs() << "After rebuild\n";
+#endif
 
         /* relink BasicBlocks */
         // Don't modify, it's magic....
