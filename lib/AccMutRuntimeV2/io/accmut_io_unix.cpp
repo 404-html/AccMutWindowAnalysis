@@ -28,7 +28,7 @@ void check_all() {
             fprintf(stderr, "Checking %d\n", fd);
             check_eq(fdmap[fd]->tag, file_descriptor::REAL_FILE);
             auto rfd = static_cast<real_file_descriptor *>(fdmap[fd]);
-            check_mem(rfd->buffer.data(), buf, sb.st_size);
+            check_mem(rfd->buffer->data(), buf, sb.st_size);
         } else {
             fprintf(stderr, "Can't read %d\n", fd);
         }
@@ -48,7 +48,7 @@ void dump_text(int fd) {
     }
     fprintf(stderr, "Dump file %d\n", fd);
     auto rfd = static_cast<real_file_descriptor *>(fdstruct);
-    write(STDERR_FILENO, rfd->buffer.data(), rfd->size);
+    write(STDERR_FILENO, rfd->buffer->data(), rfd->size);
 }
 
 void dump_bin(int fd) {
@@ -64,8 +64,8 @@ void dump_bin(int fd) {
     fprintf(stderr, "Dump file %d\n", fd);
     auto rfd = static_cast<real_file_descriptor *>(fdstruct);
     for (size_t i = 0; i < rfd->size; ++i) {
-        fprintf(stderr, "%02x ", rfd->buffer[i]);
-        if (rfd->buffer[i] == '\n')
+        fprintf(stderr, "%02x ", (*(rfd->buffer))[i]);
+        if ((*(rfd->buffer))[i] == '\n')
             fprintf(stderr, "\n");
     }
 }
