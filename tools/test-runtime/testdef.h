@@ -36,10 +36,13 @@ struct __name ## _runner {\
             exit(0);\
         }\
         wait(&status);\
-        if (!WIFEXITED(status))\
-            fprintf(stderr, "**** ori not exited normally\n");\
-        else if ((retst = WEXITSTATUS(status)) != 0)\
-            fprintf(stderr, "**** ori not exited normally with %d\n", retst);\
+        if (WIFEXITED(status)) {\
+            if ((retst = WEXITSTATUS(status)) != 0) {\
+                fprintf(stderr, "**** ori not exited normally with %d\n", retst);\
+            }\
+        } else if (WIFSIGNALED(status)) {\
+            fprintf(stderr, "**** ori not exited normally with signal %d\n", WTERMSIG(status));\
+        }\
         fprintf(stderr, "---- Running new\n");\
         __name ## _test<1> newtest;\
         pid = fork();\
@@ -49,10 +52,13 @@ struct __name ## _runner {\
             exit(0);\
         }\
         wait(&status);\
-        if (!WIFEXITED(status))\
-            fprintf(stderr, "**** new not exited normally\n");\
-        else if ((retst = WEXITSTATUS(status)) != 0)\
-            fprintf(stderr, "**** new not exited normally with %d\n", retst);\
+        if (WIFEXITED(status)) {\
+            if ((retst = WEXITSTATUS(status)) != 0) {\
+                fprintf(stderr, "**** ori not exited normally with %d\n", retst);\
+            }\
+        } else if (WIFSIGNALED(status)) {\
+            fprintf(stderr, "**** ori not exited normally with signal %d\n", WTERMSIG(status));\
+        }\
         fprintf(stderr, "---- Finish running test %s\n", #__name);\
     }\
 };

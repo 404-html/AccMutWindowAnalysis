@@ -6,6 +6,7 @@
 #define LLVM_TEST_UNIX_H
 
 #include "testinit.h"
+#include <llvm/AccMutRuntimeV2/fs/accmut_fs_simulate.h>
 
 TEST(unix,
      RUN(
