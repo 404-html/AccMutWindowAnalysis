@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <map>
 #include "accmut_io_check.h"
+#include "../fs/accmut_fs_memfile.h"
+#include "../fs/accmut_fs_simulate.h"
 
 class file_descriptor {
 public:
@@ -59,9 +61,9 @@ class real_file_descriptor : public file_descriptor {
     friend void dump_bin(int);
 
     off_t pos;
-    off_t size;
     int flags;
-    std::vector<char> buffer;
+    // std::shared_ptr<std::vector<char>> buffer;
+    std::shared_ptr<mem_file> file;
 public:
     off_t lseek(off_t offset, int whence) override;
 
@@ -87,7 +89,8 @@ public:
 
     int putc(int c) override;
 
-    real_file_descriptor(int fd, int flags);
+    // real_file_descriptor(int fd, int flags);
+    real_file_descriptor(std::shared_ptr<mem_file> file, int fd, int flags);
 };
 
 class std_file_descriptor : public file_descriptor {

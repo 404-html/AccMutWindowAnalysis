@@ -56,7 +56,7 @@ ACCMUTV2_FILE *__accmutv2__fopen(const char *path, const char *mode) {
         }
         file->fd = fileno(file->orifile);
 
-        __accmutv2__register(file->fd, flags);
+        __accmutv2__register(path, file->fd, flags);
     } else {
         file = new ACCMUTV2_FILE();
         file->orifile = nullptr;

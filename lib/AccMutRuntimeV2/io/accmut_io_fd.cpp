@@ -12,7 +12,7 @@ off_t real_file_descriptor::lseek(off_t offset, int whence) {
     if (whence == SEEK_CUR) {
         newpos = pos + offset;
     } else if (whence == SEEK_END) {
-        newpos = size + offset;
+        newpos = file->size + offset;
     } else if (whence == SEEK_SET) {
         newpos = offset;
     } else {
@@ -32,17 +32,17 @@ ssize_t real_file_descriptor::read(void *buf, size_t count) {
         errno = EBADF;
         return -1;
     }
-    if (pos + count < size) {
-        memcpy(buf, buffer.data() + pos, count);
+    if (pos + count < file->size) {
+        memcpy(buf, file->data.data() + pos, count);
         pos += count;
         return count;
     } else {
-        auto len = size - pos;
+        auto len = file->size - pos;
         if (len == 0) {
             return 0;
         }
-        memcpy(buf, buffer.data() + pos, len);
-        pos = size;
+        memcpy(buf, file->data.data() + pos, len);
+        pos = file->size;
         return len;
     }
 }
@@ -52,14 +52,14 @@ ssize_t real_file_descriptor::write(const void *buf, size_t count) {
         errno = EBADF;
         return -1;
     }
-    if (pos + count < size) {
-        memcpy(buffer.data() + pos, buf, count);
+    if (pos + count < file->size) {
+        memcpy(file->data.data() + pos, buf, count);
         pos += count;
         return count;
     } else {
-        buffer.resize(std::max<size_t>(buffer.size() * 2, pos + count));
-        size = pos + count;
-        memcpy(buffer.data() + pos, buf, count);
+        file->data.resize(std::max<size_t>(file->data.size() * 2, pos + count));
+        file->size = pos + count;
+        memcpy(file->data.data() + pos, buf, count);
         pos += count;
         return count;
     }
@@ -72,23 +72,23 @@ char *real_file_descriptor::gets(char *s, int size, int &eof_seen) {
         s[0] = 0;
         return s;
     }
-    if (pos >= this->size) {
+    if (pos >= this->file->size) {
         s[0] = 0;
         eof_seen = true;
         return nullptr;
     }
-    int len = std::min(size - 1, (int) (this->size - pos)); // len >= 1
-    char *t = (char *) memchr(buffer.data() + pos, '\n', len);
+    int len = std::min(size - 1, (int) (this->file->size - pos)); // len >= 1
+    char *t = (char *) memchr(file->data.data() + pos, '\n', len);
 
     if (t != nullptr) {
-        len = (int) (t - buffer.data() - pos);
+        len = (int) (t - file->data.data() - pos);
         ++t;
         ++len;
     } else {
         if (len != size - 1)
             eof_seen = true;
     }
-    memcpy(s, buffer.data() + pos, len);
+    memcpy(s, file->data.data() + pos, len);
     pos += len;
     *(s + len) = 0;
     return s;
@@ -100,7 +100,7 @@ int real_file_descriptor::puts(const char *s) {
 }
 
 int real_file_descriptor::eof() {
-    if (pos >= size)
+    if (pos >= file->size)
         return 1;
     return 0;
 }
@@ -110,25 +110,25 @@ size_t real_file_descriptor::readobj(void *buf, size_t size, size_t nitem, int u
     if (request == 0)
         return 0;
     if (ungotchar == EOF) {
-        if (pos + request > this->size) {
-            memcpy(buf, buffer.data() + pos, size - pos);
-            size_t res = (this->size - pos) / size;
-            pos = this->size;
+        if (pos + request > this->file->size) {
+            memcpy(buf, file->data.data() + pos, size - pos);
+            size_t res = (this->file->size - pos) / size;
+            pos = this->file->size;
             return res;
         } else {
-            memcpy(buf, buffer.data() + pos, request);
+            memcpy(buf, file->data.data() + pos, request);
             pos += request;
             return (int) nitem;
         }
     } else {
         ((char *) buf)[0] = (char) ungotchar;
-        if (pos + request > this->size + 1) {
-            memcpy((char *) buf + 1, buffer.data() + pos, size - pos);
-            size_t res = (this->size - pos + 1) / size;
-            pos = this->size;
+        if (pos + request > this->file->size + 1) {
+            memcpy((char *) buf + 1, file->data.data() + pos, size - pos);
+            size_t res = (this->file->size - pos + 1) / size;
+            pos = this->file->size;
             return res;
         } else {
-            memcpy((char *) buf + 1, buffer.data() + pos, request - 1);
+            memcpy((char *) buf + 1, file->data.data() + pos, request - 1);
             pos += request - 1;
             return (int) nitem;
         }
@@ -136,9 +136,9 @@ size_t real_file_descriptor::readobj(void *buf, size_t size, size_t nitem, int u
 }
 
 int real_file_descriptor::getc() {
-    if (pos >= size)
+    if (pos >= file->size)
         return EOF;
-    int ret = buffer[pos];
+    int ret = file->data[pos];
     pos++;
     return ret;
 }
@@ -165,6 +165,7 @@ int real_file_descriptor::putc(int c) {
     return c;
 }
 
+/*
 real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(fd, REAL_FILE) {
     this->flags = flags;
     struct stat sb;
@@ -173,12 +174,22 @@ real_file_descriptor::real_file_descriptor(int fd, int flags) : file_descriptor(
     auto buf = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (!buf)
         return;
-    buffer.resize(sb.st_size + 10);
-    memcpy(buffer.data(), buf, sb.st_size);
+    buffer = std::make_shared<std::vector<char>>();
+    buffer->resize(sb.st_size + 10);
+    memcpy(buffer->data(), buf, sb.st_size);
     munmap(buf, sb.st_size);
     size = sb.st_size;
     if (flags & O_APPEND)
         pos = size;
+    else
+        pos = 0;
+    ok = true;
+}*/
+
+real_file_descriptor::real_file_descriptor(std::shared_ptr<mem_file> file, int fd, int flags)
+        : file_descriptor(fd, REAL_FILE), file(std::move(file)), flags(flags) {
+    if (flags & O_APPEND)
+        pos = this->file->size;
     else
         pos = 0;
     ok = true;

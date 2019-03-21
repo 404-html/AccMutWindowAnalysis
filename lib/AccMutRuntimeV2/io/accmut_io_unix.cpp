@@ -20,15 +20,21 @@ void check_all() {
         }
         void *buf;
         if (fdmap[fd]->canread()) {
-            auto buf = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-            if (buf == MAP_FAILED) {
-                fprintf(stderr, "Can't map the file of %d\n", fd);
-                continue;
+            if (sb.st_size == 0) {
+                fprintf(stderr, "Checking %d\n", fd);
+                check_eq(static_cast<real_file_descriptor *>(fdmap[fd])->file->size, 0);
+            } else {
+                auto buf = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+                if (buf == MAP_FAILED) {
+                    fprintf(stderr, "Can't map the file of %d\n", fd);
+                    perror("Failed to map");
+                    continue;
+                }
+                fprintf(stderr, "Checking %d\n", fd);
+                check_eq(fdmap[fd]->tag, file_descriptor::REAL_FILE);
+                auto rfd = static_cast<real_file_descriptor *>(fdmap[fd]);
+                check_mem(rfd->file->data.data(), buf, sb.st_size);
             }
-            fprintf(stderr, "Checking %d\n", fd);
-            check_eq(fdmap[fd]->tag, file_descriptor::REAL_FILE);
-            auto rfd = static_cast<real_file_descriptor *>(fdmap[fd]);
-            check_mem(rfd->buffer->data(), buf, sb.st_size);
         } else {
             fprintf(stderr, "Can't read %d\n", fd);
         }
@@ -48,7 +54,7 @@ void dump_text(int fd) {
     }
     fprintf(stderr, "Dump file %d\n", fd);
     auto rfd = static_cast<real_file_descriptor *>(fdstruct);
-    write(STDERR_FILENO, rfd->buffer->data(), rfd->size);
+    write(STDERR_FILENO, rfd->file->data.data(), rfd->file->size);
 }
 
 void dump_bin(int fd) {
@@ -63,21 +69,31 @@ void dump_bin(int fd) {
     }
     fprintf(stderr, "Dump file %d\n", fd);
     auto rfd = static_cast<real_file_descriptor *>(fdstruct);
-    for (size_t i = 0; i < rfd->size; ++i) {
-        fprintf(stderr, "%02x ", (*(rfd->buffer))[i]);
-        if ((*(rfd->buffer))[i] == '\n')
+    for (size_t i = 0; i < rfd->file->size; ++i) {
+        fprintf(stderr, "%02x ", rfd->file->data[i]);
+        if (rfd->file->data[i] == '\n')
             fprintf(stderr, "\n");
     }
 }
 
 extern "C" {
 
+/*
 int __accmutv2__register(int fd, int flags) {
-    fdmap[fd] = new real_file_descriptor(fd, flags);
+fdmap[fd] = new real_file_descriptor(fd, flags);
+opened_file_list.push_back(fd);
+// TODO: check _fdmap[fd] available
+return 0;
+}*/
+
+int __accmutv2__register(const char *pathname, int fd, int flags) {
+    std::shared_ptr<mem_file> f = fs_query(pathname, flags & O_TRUNC);
+    fdmap[fd] = new real_file_descriptor(f, fd, flags);
     opened_file_list.push_back(fd);
-    // TODO: check _fdmap[fd] available
     return 0;
 }
+
+
 int __accmutv2__deregister(int fd) {
     if (!fdmap[fd]) {
         errno = EBADF;
@@ -120,6 +136,25 @@ ssize_t __accmutv2__write__nosync(int fd, const void *buf, size_t count) {
 
 int __accmutv2__open(const char *pathname, int flags, ...) {
     int fd;
+    int mode = 0;
+    if (flags & O_CREAT) {
+        va_list lst;
+        va_start(lst, flags);
+        mode = va_arg(lst, int);
+        va_end(lst);
+    }
+    if (MUTATION_ID == 0) {
+        fd = open(pathname, flags, mode);
+        if (fd == -1)
+            return -1;
+    } else {
+        fd = -1;
+    }
+    // FIXME: MUTATION_ID != 0: bug!!!
+    __accmutv2__register(pathname, fd, flags);
+    return fd;
+    /*
+    int fd;
     if (flags & O_CREAT) {
         va_list lst;
         va_start(lst, flags);
@@ -154,7 +189,7 @@ int __accmutv2__open(const char *pathname, int flags, ...) {
     __accmutv2__register(fd, flags);
     if (MUTATION_ID != 0)
         close(fd);
-    return fd;
+    return fd;*/
 }
 
 int __accmutv2__creat(const char *pathname, mode_t mode) {

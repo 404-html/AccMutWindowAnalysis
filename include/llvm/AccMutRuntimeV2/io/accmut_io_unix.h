@@ -13,7 +13,8 @@ extern "C" {
 #endif
 
 /* Unix IO without synchronization */
-int __accmutv2__register(int fd, int flags);
+// int __accmutv2__register(int fd, int flags);
+int __accmutv2__register(const char *pathname, int fd, int flags);
 int __accmutv2__deregister(int fd);
 off_t __accmutv2__lseek__nosync(int fd, off_t offset, int whence);
 ssize_t __accmutv2__read__nosync(int fd, void *buf, size_t count);
