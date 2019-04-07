@@ -5,8 +5,8 @@
 #ifndef LLVM_ACCMUT_IO_CHECK_H
 #define LLVM_ACCMUT_IO_CHECK_H
 
-#include "../accmut_config.h"
-#include "accmut_io_restrict.h"
+#include "llvm/AccMutRuntimeV3/accmut_config.h"
+#include "llvm/AccMutRuntimeV3/io/accmut_io_restrict.h"
 #include <stdio.h>
 #include <string.h>
 #include <string>

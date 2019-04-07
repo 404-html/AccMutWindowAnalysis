@@ -7,7 +7,7 @@
 #include <cstdarg>
 #include <llvm/AccMutRuntimeV2/accmut_io.h>
 #include <llvm/AccMutRuntimeV2/io/accmut_io_stdio_support.h>
-#include <llvm/AccMutRuntimeV2/io/accmut_io_check.h>
+#include <llvm/AccMutRuntimeV2/io/check.h>
 
 #define FL_LJUST    0x0001      /* left-justify field */
 #define FL_SIGN     0x0002      /* sign in signed conversions */
