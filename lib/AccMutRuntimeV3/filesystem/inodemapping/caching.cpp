@@ -2,13 +2,13 @@
 // Created by Sirui Lu on 2019-04-08.
 //
 
-#include <llvm/AccMutRuntimeV3/filesystem/caching.h>
-#include <llvm/AccMutRuntimeV3/filesystem/inode.h>
+#include <llvm/AccMutRuntimeV3/filesystem/inodemapping/caching.h>
+#include <llvm/AccMutRuntimeV3/filesystem/datastructure/inode.h>
 #include <llvm/AccMutRuntimeV3/checking/panic.h>
-#include <llvm/AccMutRuntimeV3/filesystem/DirectoryFile.h>
-#include <llvm/AccMutRuntimeV3/filesystem/RegularFile.h>
-#include <llvm/AccMutRuntimeV3/filesystem/SymbolicLinkFile.h>
-#include <llvm/AccMutRuntimeV3/filesystem/UnsupportedFile.h>
+#include <llvm/AccMutRuntimeV3/filesystem/datastructure/DirectoryFile.h>
+#include <llvm/AccMutRuntimeV3/filesystem/datastructure/RegularFile.h>
+#include <llvm/AccMutRuntimeV3/filesystem/datastructure/SymbolicLinkFile.h>
+#include <llvm/AccMutRuntimeV3/filesystem/datastructure/UnsupportedFile.h>
 
 #include <unistd.h>
 #include <sys/param.h>
@@ -23,7 +23,7 @@
 #include <dirent.h>
 
 static char cwdbuff[MAXPATHLEN];
-static std::map<ino_t, std::shared_ptr<inode>> inomap;
+std::map<ino_t, std::shared_ptr<inode>> inomap;
 
 // use cwdbuff
 static std::deque<std::string> split_str(const char *str) {

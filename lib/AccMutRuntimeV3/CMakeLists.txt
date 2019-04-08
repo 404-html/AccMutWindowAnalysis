@@ -20,9 +20,10 @@ add_llvm_library(LLVMAccMutRuntimeV3
 
         checking/check.cpp
 
-        filesystem/caching.cpp
-        filesystem/DirectoryFile.cpp
-        filesystem/inode.cpp
+        filesystem/inodemapping/caching.cpp
+        filesystem/inodemapping/linking.cpp
+        filesystem/datastructure/DirectoryFile.cpp
+        filesystem/datastructure/inode.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/AccMutRuntimeV3

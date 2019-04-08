@@ -5,7 +5,10 @@
 #ifndef LLVM_CACHING_H
 #define LLVM_CACHING_H
 
-#include "inode.h"
+#include "llvm/AccMutRuntimeV3/filesystem/datastructure/inode.h"
+#include <map>
+
+extern std::map<ino_t, std::shared_ptr<inode>> inomap;
 
 ino_t fs_cache(const char *str);
 
