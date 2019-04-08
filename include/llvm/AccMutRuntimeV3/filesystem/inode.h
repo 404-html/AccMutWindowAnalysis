@@ -7,14 +7,19 @@
 
 #include <sys/stat.h>
 #include <string>
+#include <queue>
 #include "BaseFile.h"
 
 class inode {
-    friend ino_t fs_cache(const char *str);
+    friend ino_t fs_cache_helper(const char *path);
+
+    friend void dump_helper(FILE *f, ino_t ino);
     struct stat meta;
     std::shared_ptr<BaseFile> content;
 public:
-    inode(const struct stat &meta, std::unique_ptr<BaseFile> content)
+    void dump(FILE *f);
+
+    inode(const struct stat &meta, std::shared_ptr<BaseFile> content)
             : meta(meta), content(std::move(content)) {}
 };
 

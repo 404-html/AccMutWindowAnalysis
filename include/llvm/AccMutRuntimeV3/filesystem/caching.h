@@ -9,4 +9,6 @@
 
 ino_t fs_cache(const char *str);
 
+void dump_cache(FILE *f);
+
 #endif //LLVM_CACHING_H

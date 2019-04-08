@@ -1,6 +1,7 @@
 # `Demangle', `Support' and `TableGen' libraries are added on the top-level
 # CMakeLists.txt
 
+add_subdirectory(AccMutRuntimeV2)
 add_subdirectory(AccMutRuntimeV3)
 add_subdirectory(IR)
 add_subdirectory(FuzzMutate)
