@@ -22,8 +22,11 @@ add_llvm_library(LLVMAccMutRuntimeV3
 
         filesystem/inodemapping/caching.cpp
         filesystem/inodemapping/linking.cpp
+        filesystem/inodemapping/cwd.cpp
         filesystem/datastructure/DirectoryFile.cpp
         filesystem/datastructure/inode.cpp
+        filesystem/rawapi.cpp
+        filesystem/utils/dump.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/AccMutRuntimeV3

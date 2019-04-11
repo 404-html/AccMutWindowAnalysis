@@ -5,5 +5,8 @@
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/inode.h>
 
 void inode::dump(FILE *f) {
-    content->dump(f);
+    if (content)
+        content->dump(f);
+    else
+        fprintf(stderr, "Unknown content\n");
 }

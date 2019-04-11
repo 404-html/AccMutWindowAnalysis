@@ -9,6 +9,8 @@
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/RegularFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/SymbolicLinkFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/UnsupportedFile.h>
+#include <llvm/AccMutRuntimeV3/filesystem/inodemapping/cwd.h>
+#include <llvm/AccMutRuntimeV3/filesystem/utils/perm.h>
 
 #include <unistd.h>
 #include <sys/param.h>
@@ -25,46 +27,34 @@
 static char cwdbuff[MAXPATHLEN];
 std::map<ino_t, std::shared_ptr<inode>> inomap;
 
-// use cwdbuff
-static std::deque<std::string> split_str(const char *str) {
-    char buf[MAXPATHLEN];
-    strcpy(buf, str);
-    char *b = buf;
-    char *e = b;
-    std::deque<std::string> ret;
-    while (*e != 0) {
-        if (*e == '/') {
-            if (b == e) {
-                b = ++e;
-                continue;
-            }
-            *e = 0;
-            ret.push_back(b);
-            b = ++e;
-        } else {
-            ++e;
-        }
-    }
-    if (b != e)
-        ret.push_back(b);
-    return ret;
-}
-
-static ino_t cache_path(const char *path) {
+// remove and restore the path
+ino_t cache_path(const char *path) {
+    fprintf(stderr, "%s\n", path);
     struct stat st;
     if (lstat(path, &st) < 0)
         return 0;
-    if (inomap.find(st.st_ino) != inomap.end())
+    auto iter = inomap.find(st.st_ino);
+    if (iter != inomap.end()) {
+        if (iter->second->cached())
+            return st.st_ino;
+    }
+    if (!check_read_perm(st)) {
+        // no read permission
+        if (S_ISLNK(st.st_mode)) {
+            panic("No read perm for link");
+        }
+        inomap[st.st_ino] = std::make_shared<inode>(st, nullptr);
         return st.st_ino;
+    }
     // assume no write only files...
     if (S_ISREG(st.st_mode)) {
         int fd = open(path, O_RDONLY);
         if (!fd)
-            return 0;
+            panic("Failed to open");
         auto buf = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
         if (!buf) {
             close(fd);
-            return 0;
+            panic("Failed to mmap");
         }
         std::vector<char> tmp;
         tmp.resize(st.st_size + 10);
@@ -99,7 +89,7 @@ static ino_t cache_path(const char *path) {
     return st.st_ino;
 }
 
-static ino_t get_root_ino() {
+ino_t get_root_ino() {
     static bool got;
     static ino_t ino;
     if (!got) {
@@ -109,29 +99,92 @@ static ino_t get_root_ino() {
     return ino;
 }
 
+ino_t get_current_ino() {
+    return getwdino_internal();
+}
+
 static int link_depth = 0;
 
-ino_t fs_cache_helper(const char *path) {
+ino_t cache_tree_recur(const char *path, int depth) {
+    if (depth >= 200)
+        return 0;
+    char buff[2 * MAXPATHLEN];
+    strcpy(buff, path);
+    size_t len = strlen(buff);
+    size_t lstlen = len;
+    for (; lstlen != 0; --lstlen) {
+        if (buff[lstlen] == '/') {
+            buff[lstlen] = 0;
+            cache_tree_recur(buff, depth + 1);
+            break;
+        }
+    }
+    fprintf(stderr, "%s\t%d\n", path, depth);
+    ino_t outer = cache_path(path);
+    if (outer != 0) {
+        auto outer_inode = inomap[outer];
+        if (outer_inode->isLnk()) {
+            buff[lstlen] = '/';
+            auto t = readlink(path, buff + lstlen + 1, MAXPATHLEN);
+            buff[lstlen + 1 + t] = 0;
+            if (t < 0)
+                return 0;
+            cache_tree_recur(buff, depth + 1);
+        }
+    }
+    return outer;
+}
+
+ino_t cache_tree(const char *path) {
     char buff[MAXPATHLEN];
-    if (path[0] == '/') {
-        strcpy(buff, path);
-    } else {
-        if (getwd(buff) == nullptr)
-            return 0;
+    if (is_relapath(path)) {
+        getrelawd_internal(buff);
         strcat(buff, "/");
         strcat(buff, path);
+    } else {
+        strcpy(buff, path);
     }
+    return cache_tree_recur(buff, 0);
+}
+
+/*
+std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
+    char buff[MAXPATHLEN];
+    bool is_relative;
+    if (path[0] == '/') {
+        strcpy(buff, path);
+        is_relative = false;
+    } else {
+        strcpy(buff, "./");
+        strcat(buff, path);
+        is_relative = true;
+    }
+    printf("%s\n", buff);
     std::vector<size_t> lastbasestack;
-    lastbasestack.push_back(get_root_ino());
     std::vector<size_t> lastposstack;
-    lastposstack.push_back(0);
+    if (!is_relative) {
+        lastbasestack.push_back(get_root_ino());
+        lastposstack.push_back(0);
+    } else {
+        lastbasestack.push_back(get_current_ino());
+        lastposstack.push_back(1);
+    }
+
     std::deque<std::string> strdeque = split_str(buff);
     int follownum = 0;
     while (!strdeque.empty()) {
         std::string str = strdeque.front();
         strdeque.pop_front();
         size_t base = lastbasestack.back();
+        if (!inomap[base]->cached()) {
+            errno = EACCES;
+            return nullptr;
+        }
         if (S_ISDIR(inomap[base]->meta.st_mode)) {
+            if (!check_execute_perm(inomap[base]->meta)) {
+                errno = EACCES;
+                return nullptr;
+            }
             auto dirfile = std::static_pointer_cast<DirectoryFile>(
                     inomap[base]->content);
             for (auto &d : *dirfile) {
@@ -141,7 +194,8 @@ ino_t fs_cache_helper(const char *path) {
                 }
             }
             // failed to find
-            goto fail;
+            errno = ENOENT;
+            return nullptr;
             ok:
             lastposstack.push_back(lastposstack.back());
             auto &bufpos = lastposstack.back();
@@ -152,6 +206,11 @@ ino_t fs_cache_helper(const char *path) {
 
             base = cache_path(buff);
             lastbasestack.push_back(base);
+            // Cannot retrive
+            if (lastbasestack.back() == 0) {
+                errno = ENOENT;
+                return 0;
+            }
             link_depth = 0;
             continue;
         } else if (S_ISLNK(inomap[base]->meta.st_mode)) {
@@ -159,11 +218,6 @@ ino_t fs_cache_helper(const char *path) {
                 errno = ELOOP;
                 return 0;
             }
-            /*char buffsym[MAXPATHLEN];
-            memcpy(buffsym, buff, bufpos);
-            ssize_t s = readlink(buff, cwdbuff, MAXPATHLEN);
-            memcpy(&buffsym[lastpos + 1], cwdbuff, s);
-            buffsym[lastpos + s + 1] = 0;*/
             char buff1[MAXPATHLEN];
             ssize_t s = readlink(buff, buff1, MAXPATHLEN);
             buff1[s] = 0;
@@ -185,44 +239,9 @@ ino_t fs_cache_helper(const char *path) {
             }
             continue;
         }
-        fail:
         errno = ENOENT;
         return 0;
     }
-    return lastbasestack.back();
-}
-
-ino_t fs_cache(const char *str) {
-    char buff[MAXPATHLEN];
-    if (str[0] == '/') {
-        strcpy(buff, str);
-    } else {
-        if (getwd(buff) == nullptr)
-            return 0;
-        strcat(buff, "/");
-        strcat(buff, str);
-    }
-    return fs_cache_helper(str);
-}
-
-static std::set<ino_t> dumped;
-
-void dump_helper(FILE *f, ino_t ino) {
-    fprintf(f, "Start dump: %lu\n", (unsigned long) ino);
-    dumped.insert(ino);
-    auto ptr = inomap[ino];
-    ptr->dump(f);
-    if (S_ISDIR(ptr->meta.st_mode)) {
-        for (const auto &t : *std::static_pointer_cast<DirectoryFile>(ptr->content)) {
-            if (dumped.find(t.d_ino) == dumped.end())
-                if (inomap.find(t.d_ino) != inomap.end())
-                    dump_helper(f, t.d_ino);
-        }
-    }
-    fprintf(f, "End dump: %lu\n", (unsigned long) ino);
-}
-
-void dump_cache(FILE *f) {
-    dumped.clear();
-    dump_helper(f, get_root_ino());
-}
+    return nullptr;
+    // return lastbasestack.back();
+}*/
