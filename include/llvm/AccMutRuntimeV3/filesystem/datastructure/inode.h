@@ -9,6 +9,7 @@
 #include <string>
 #include <queue>
 #include "BaseFile.h"
+#include <llvm/AccMutRuntimeV3/filesystem/utils/perm.h>
 
 class inode {
     friend ino_t cache_tree(const char *path);
@@ -36,6 +37,18 @@ public:
 
     inline bool isReg() {
         return S_ISREG(meta.st_mode);
+    }
+
+    inline bool canRead() {
+        return check_read_perm(meta);
+    }
+
+    inline bool canWrite() {
+        return check_write_perm(meta);
+    }
+
+    inline bool canExecute() {
+        return check_execute_perm(meta);
     }
 
     inline bool cached() {
