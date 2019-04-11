@@ -31,14 +31,14 @@ public:
 
 int chdir_internal(const char *path) {
     if (path[0] == '/') {
-        auto ptr = query_tree(path, CHECK_X);
+        auto ptr = query_tree(path, CHECK_X, true);
         if (ptr == nullptr)
             return -1;
         current_ino = ptr->getIno();
         relative_path = split_path(path);
         relative = false;
     } else {
-        auto ptr = query_tree(path, CHECK_X);
+        auto ptr = query_tree(path, CHECK_X, true);
         if (ptr == nullptr)
             return -1;
         current_ino = ptr->getIno();

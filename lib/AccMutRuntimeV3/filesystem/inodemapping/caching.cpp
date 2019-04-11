@@ -151,7 +151,7 @@ ino_t cache_tree(const char *path) {
     return cache_tree_recur(buff, 0);
 }
 
-std::shared_ptr<inode> query_tree(const char *path, int checkmode) {
+std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_symlink) {
     char buff_base[MAXPATHLEN];
     char *buff = buff_base + 2;
     strcpy(buff, path);
@@ -183,6 +183,8 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode) {
     }
 
     std::deque<std::string> strdeque = split_path(buff);
+    if (follow_symlink)
+        strdeque.push_back(".");
     int follownum = 0;
     while (!strdeque.empty()) {
         printf("%s\n", buff);
@@ -251,6 +253,9 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode) {
                 lastposstack.push_back(0);
             }
             continue;
+        } else if (strdeque.empty() && follow_symlink) {
+            // actually found
+            break;
         }
         errno = ENOENT;
         return nullptr;
