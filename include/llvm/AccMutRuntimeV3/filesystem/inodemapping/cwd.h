@@ -13,7 +13,7 @@
 #include <string>
 #include <deque>
 
-void chdir_internal(const char *path);
+int chdir_internal(const char *path);
 
 ino_t getwdino_internal();
 

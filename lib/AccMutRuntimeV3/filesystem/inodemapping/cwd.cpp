@@ -31,11 +31,17 @@ public:
 
 int chdir_internal(const char *path) {
     if (path[0] == '/') {
-        current_ino = cache_tree(path);
+        auto ptr = query_tree(path, CHECK_X);
+        if (ptr == nullptr)
+            return -1;
+        current_ino = ptr->getIno();
         relative_path = split_path(path);
         relative = false;
     } else {
-        current_ino = cache_tree(path);
+        auto ptr = query_tree(path, CHECK_X);
+        if (ptr == nullptr)
+            return -1;
+        current_ino = ptr->getIno();
         auto sp = split_path(path);
         auto sp1 = remove_redundant(sp.begin(), sp.end());
         auto b1 = relative_path.begin(), e1 = relative_path.end(),
@@ -56,6 +62,7 @@ int chdir_internal(const char *path) {
         while (b2 != e2)
             relative_path.push_back(*b2++);
     }
+    return 0;
 }
 
 ino_t getwdino_internal() {

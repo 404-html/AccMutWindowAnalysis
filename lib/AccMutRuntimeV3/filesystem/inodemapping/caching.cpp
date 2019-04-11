@@ -151,7 +151,7 @@ ino_t cache_tree(const char *path) {
     return cache_tree_recur(buff, 0);
 }
 
-std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
+std::shared_ptr<inode> query_tree(const char *path, int checkmode) {
     if (cache_tree(path) == 0)
         return nullptr;
     char buff[MAXPATHLEN];
@@ -254,8 +254,14 @@ std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
         errno = EACCES;
         return nullptr;
     }
-    if ((iter->second->getStat().st_mode & mode) == mode)
-        return iter->second;
+    if ((checkmode & CHECK_R) && !iter->second->canRead())
+        goto noaccess;
+    if ((checkmode & CHECK_W) && !iter->second->canWrite())
+        goto noaccess;
+    if ((checkmode & CHECK_X) && !iter->second->canExecute())
+        goto noaccess;
+    return iter->second;
+    noaccess:
     errno = EACCES;
     return nullptr;
     // return lastbasestack.back();
