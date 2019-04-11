@@ -245,3 +245,10 @@ std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
     return nullptr;
     // return lastbasestack.back();
 }*/
+
+std::shared_ptr<inode> ino2inode(ino_t ino) {
+    auto iter = inomap.find(ino);
+    if (iter == inomap.end())
+        return nullptr;
+    return iter->second;
+}
