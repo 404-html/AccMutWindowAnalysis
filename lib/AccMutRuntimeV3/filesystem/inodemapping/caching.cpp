@@ -152,16 +152,23 @@ ino_t cache_tree(const char *path) {
 }
 
 std::shared_ptr<inode> query_tree(const char *path, int checkmode) {
+    char buff_base[MAXPATHLEN];
+    char *buff = buff_base + 2;
+    strcpy(buff, path);
+    size_t len = strlen(path);
+    if (buff[len - 1] == '/') {
+        buff[len] = '.';
+        buff[len + 1] = 0;
+    }
     if (cache_tree(path) == 0)
         return nullptr;
-    char buff[MAXPATHLEN];
     bool is_relative;
     if (path[0] == '/') {
-        strcpy(buff, path);
+        // strcpy(buff, path);
         is_relative = false;
     } else {
-        strcpy(buff, "./");
-        strcat(buff, path);
+        *(--buff) = '/';
+        *(--buff) = '.';
         is_relative = true;
     }
     printf("%s\n", buff);
