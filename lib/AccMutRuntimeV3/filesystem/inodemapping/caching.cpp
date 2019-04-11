@@ -3,26 +3,14 @@
 //
 
 #include <llvm/AccMutRuntimeV3/filesystem/inodemapping/caching.h>
-#include <llvm/AccMutRuntimeV3/filesystem/datastructure/inode.h>
 #include <llvm/AccMutRuntimeV3/checking/panic.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/DirectoryFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/RegularFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/SymbolicLinkFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/UnsupportedFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/inodemapping/cwd.h>
-#include <llvm/AccMutRuntimeV3/filesystem/utils/perm.h>
 
-#include <unistd.h>
-#include <sys/param.h>
-#include <vector>
-#include <string>
-#include <memory>
-#include <map>
 #include <set>
-#include <queue>
-#include <stack>
-#include <deque>
-#include <dirent.h>
 #include <stack>
 
 static char cwdbuff[MAXPATHLEN];
@@ -151,7 +139,11 @@ ino_t cache_tree(const char *path) {
     return cache_tree_recur(buff, 0);
 }
 
-std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_symlink) {
+std::shared_ptr<inode> query_tree(
+        const char *path,
+        int checkmode,
+        bool follow_symlink,
+        std::string *real_relapath) {
     char buff_base[MAXPATHLEN];
     char *buff = buff_base + 2;
     strcpy(buff, path);
@@ -183,6 +175,7 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_s
     }
 
     std::deque<std::string> strdeque = split_path(buff);
+    std::deque<std::string> realpath_deque;
     if (follow_symlink)
         strdeque.push_back(".");
     int follownum = 0;
@@ -222,6 +215,8 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_s
 
             // base = cache_path(buff);
             lastbasestack.push_back(base);
+            if (real_relapath)
+                realpath_deque.push_back(std::move(str));
             // Cannot retrive
             if (lastbasestack.back() == 0) {
                 errno = ENOENT;
@@ -244,9 +239,13 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_s
                 strdeque.push_front(*rb);
             }
             if (relative) {
+                if (real_relapath)
+                    realpath_deque.pop_back();
                 lastbasestack.pop_back();
                 lastposstack.pop_back();
             } else {
+                if (real_relapath)
+                    realpath_deque.clear();
                 lastbasestack.clear();
                 lastposstack.clear();
                 lastbasestack.push_back(get_root_ino());
@@ -272,6 +271,22 @@ std::shared_ptr<inode> query_tree(const char *path, int checkmode, bool follow_s
         goto noaccess;
     if ((checkmode & CHECK_X) && !iter->second->canExecute())
         goto noaccess;
+    if (real_relapath) {
+        if (is_relative) {
+            getwd_internal(buff);
+            auto d = split_path(buff);
+            *real_relapath = concat_path(
+                    d.begin(), d.end(),
+                    realpath_deque.begin(),
+                    realpath_deque.end(),
+                    false);
+        } else {
+            *real_relapath = concat_path(
+                    realpath_deque.begin(),
+                    realpath_deque.end(),
+                    false);
+        }
+    }
     return iter->second;
     noaccess:
     errno = EACCES;

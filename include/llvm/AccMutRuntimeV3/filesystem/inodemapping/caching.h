@@ -17,7 +17,8 @@ ino_t cache_path(const char *str);
 
 ino_t cache_tree(const char *str);
 
-std::shared_ptr<inode> query_tree(const char *str, int checkmode, bool follow_symlink);
+std::shared_ptr<inode>
+query_tree(const char *str, int checkmode, bool follow_symlink, std::string *real_relapath = nullptr);
 
 std::shared_ptr<inode> ino2inode(ino_t);
 
