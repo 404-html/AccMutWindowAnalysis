@@ -15,19 +15,21 @@ static std::deque<std::string> relative_path = {};
 static ino_t current_ino;
 static bool inited = false;
 
-static void init() {
-    if (inited)
-        return;
-    current_ino = cache_path(".");
-    current_rela_avail = getwd(current_rela_buf) != nullptr;
-    if (current_rela_avail) {
-        current_rela_splitted = split_path(current_rela_buf);
+static struct _PWD_INIT {
+public:
+    inline _PWD_INIT() {
+        printf("INIT\n");
+        current_ino = cache_path(".");
+        if (current_ino == 0)
+            panic("Failed to init");
+        current_rela_avail = getwd(current_rela_buf) != nullptr;
+        if (current_rela_avail) {
+            current_rela_splitted = split_path(current_rela_buf);
+        }
     }
-    inited = true;
-}
+} _init_obj;
 
-void chdir_internal(const char *path) {
-    init();
+int chdir_internal(const char *path) {
     if (path[0] == '/') {
         current_ino = cache_tree(path);
         relative_path = split_path(path);
@@ -57,12 +59,10 @@ void chdir_internal(const char *path) {
 }
 
 ino_t getwdino_internal() {
-    init();
     return current_ino;
 }
 
 int getcwd_internal(char *buf, size_t size) {
-    init();
     if (current_ino == 0) {
         errno = EACCES;
         return -1;
@@ -103,7 +103,6 @@ int getcwd_internal(char *buf, size_t size) {
 }
 
 void getrelawd_internal(char *buf) {
-    init();
     std::string str = concat_path_nodup(
             relative_path.begin(),
             relative_path.end(), relative);
@@ -111,7 +110,6 @@ void getrelawd_internal(char *buf) {
 }
 
 int getwd_internal(char *buf) {
-    init();
     if (current_ino == 0) {
         errno = EACCES;
         return -1;
