@@ -27,10 +27,10 @@
 
 static char cwdbuff[MAXPATHLEN];
 static std::map<ino_t, std::shared_ptr<inode>> inomap;
+static std::set<ino_t> cached;
 
 // remove and restore the path
 ino_t cache_path(const char *path) {
-    fprintf(stderr, "%s\n", path);
     struct stat st;
     if (lstat(path, &st) < 0)
         return 0;
@@ -39,6 +39,9 @@ ino_t cache_path(const char *path) {
         if (iter->second->cached())
             return st.st_ino;
     }
+    if (cached.find(st.st_ino) != cached.end())
+        return st.st_ino;
+    fprintf(stderr, "%s\n", path);
     if (!check_read_perm(st)) {
         // no read permission
         if (S_ISLNK(st.st_mode)) {
