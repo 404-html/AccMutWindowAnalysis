@@ -12,9 +12,6 @@
 #include <llvm/AccMutRuntimeV3/filesystem/utils/perm.h>
 
 class inode {
-    friend ino_t cache_tree(const char *path);
-
-    friend std::shared_ptr<inode> query_tree(const char *path, mode_t mode);
     friend void dump_helper(FILE *f, ino_t ino);
     struct stat meta;
     std::shared_ptr<BaseFile> content;
@@ -49,6 +46,10 @@ public:
 
     inline bool canExecute() {
         return check_execute_perm(meta);
+    }
+
+    inline ino_t getIno() {
+        return meta.st_ino;
     }
 
     inline bool cached() {

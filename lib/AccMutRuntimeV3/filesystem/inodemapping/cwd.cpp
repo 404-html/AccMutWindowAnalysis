@@ -33,6 +33,7 @@ void chdir_internal(const char *path) {
         relative_path = split_path(path);
         relative = false;
     } else {
+        current_ino = cache_tree(path);
         auto sp = split_path(path);
         auto sp1 = remove_redundant(sp.begin(), sp.end());
         auto b1 = relative_path.begin(), e1 = relative_path.end(),

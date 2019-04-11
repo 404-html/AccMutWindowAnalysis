@@ -23,9 +23,10 @@
 #include <stack>
 #include <deque>
 #include <dirent.h>
+#include <stack>
 
 static char cwdbuff[MAXPATHLEN];
-std::map<ino_t, std::shared_ptr<inode>> inomap;
+static std::map<ino_t, std::shared_ptr<inode>> inomap;
 
 // remove and restore the path
 ino_t cache_path(const char *path) {
@@ -147,8 +148,9 @@ ino_t cache_tree(const char *path) {
     return cache_tree_recur(buff, 0);
 }
 
-/*
 std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
+    if (cache_tree(path) == 0)
+        return nullptr;
     char buff[MAXPATHLEN];
     bool is_relative;
     if (path[0] == '/') {
@@ -170,26 +172,28 @@ std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
         lastposstack.push_back(1);
     }
 
-    std::deque<std::string> strdeque = split_str(buff);
+    std::deque<std::string> strdeque = split_path(buff);
     int follownum = 0;
     while (!strdeque.empty()) {
+        printf("%s\n", buff);
         std::string str = strdeque.front();
         strdeque.pop_front();
         size_t base = lastbasestack.back();
-        if (!inomap[base]->cached()) {
+        auto inodeptr = inomap[base];
+        if (!inodeptr->cached()) {
             errno = EACCES;
             return nullptr;
         }
-        if (S_ISDIR(inomap[base]->meta.st_mode)) {
-            if (!check_execute_perm(inomap[base]->meta)) {
+        if (inodeptr->isDir()) {
+            if (!inomap[base]->canExecute()) {
                 errno = EACCES;
                 return nullptr;
             }
-            auto dirfile = std::static_pointer_cast<DirectoryFile>(
-                    inomap[base]->content);
+            auto dirfile = std::static_pointer_cast<DirectoryFile>(inodeptr->getUnderlyingFile());
             for (auto &d : *dirfile) {
                 if (strcmp(d.d_name, str.c_str()) == 0) {
-                    base = inomap[base]->meta.st_ino;
+                    base = d.d_ino;
+                    // base = inodeptr->getIno();
                     goto ok;
                 }
             }
@@ -204,26 +208,25 @@ std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
             bufpos += str.length();
             buff[bufpos] = 0;
 
-            base = cache_path(buff);
+            // base = cache_path(buff);
             lastbasestack.push_back(base);
             // Cannot retrive
             if (lastbasestack.back() == 0) {
                 errno = ENOENT;
-                return 0;
+                return nullptr;
             }
             link_depth = 0;
             continue;
-        } else if (S_ISLNK(inomap[base]->meta.st_mode)) {
+        } else if (inodeptr->isLnk()) {
             if (++follownum == 100) {
                 errno = ELOOP;
-                return 0;
+                return nullptr;
             }
-            char buff1[MAXPATHLEN];
-            ssize_t s = readlink(buff, buff1, MAXPATHLEN);
-            buff1[s] = 0;
-            bool relative = buff1[0] != '/';
+            auto linkto = std::static_pointer_cast<SymbolicLinkFile>(
+                    inodeptr->getUnderlyingFile())->getTarget();
+            bool relative = linkto[0] != '/';
 
-            auto d1 = split_str(buff1);
+            auto d1 = split_path(linkto.c_str());
             strdeque.push_front(str);
             for (auto rb = d1.rbegin(); rb != d1.rend(); ++rb) {
                 strdeque.push_front(*rb);
@@ -240,11 +243,20 @@ std::shared_ptr<inode> query_tree(const char *path, mode_t mode) {
             continue;
         }
         errno = ENOENT;
-        return 0;
+        return nullptr;
     }
+    ino_t ino = lastbasestack.back();
+    auto iter = inomap.find(ino);
+    if (iter == inomap.end()) {
+        errno = EACCES;
+        return nullptr;
+    }
+    if ((iter->second->getStat().st_mode & mode) == mode)
+        return iter->second;
+    errno = EACCES;
     return nullptr;
     // return lastbasestack.back();
-}*/
+}
 
 std::shared_ptr<inode> ino2inode(ino_t ino) {
     auto iter = inomap.find(ino);
