@@ -22,4 +22,6 @@ query_tree(const char *str, int checkmode, bool follow_symlink, std::string *rea
 
 std::shared_ptr<inode> ino2inode(ino_t);
 
+void register_inode(ino_t ino, std::shared_ptr<inode> ptr);
+
 #endif //LLVM_CACHING_H

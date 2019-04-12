@@ -17,6 +17,12 @@ static char cwdbuff[MAXPATHLEN];
 static std::map<ino_t, std::shared_ptr<inode>> inomap;
 static std::set<ino_t> cached;
 
+void register_inode(ino_t ino, std::shared_ptr<inode> ptr) {
+    if (inomap.find(ino) != inomap.end())
+        panic("Should not have ino in map");
+    inomap[ino] = ptr;
+}
+
 // remove and restore the path
 ino_t cache_path(const char *path) {
     struct stat st;
@@ -29,7 +35,7 @@ ino_t cache_path(const char *path) {
     }
     if (cached.find(st.st_ino) != cached.end())
         return st.st_ino;
-    fprintf(stderr, "%s\n", path);
+    // fprintf(stderr, "%s\n", path);
     if (!check_read_perm(st)) {
         // no read permission
         if (S_ISLNK(st.st_mode)) {
@@ -111,7 +117,7 @@ ino_t cache_tree_recur(const char *path, int depth) {
             break;
         }
     }
-    fprintf(stderr, "%s\t%d\n", path, depth);
+    // fprintf(stderr, "%s\t%d\n", path, depth);
     ino_t outer = cache_path(path);
     if (outer != 0) {
         auto outer_inode = inomap[outer];
@@ -152,8 +158,9 @@ std::shared_ptr<inode> query_tree(
         buff[len] = '.';
         buff[len + 1] = 0;
     }
-    if (cache_tree(path) == 0)
-        return nullptr;
+    cache_tree(path);
+    // if (cache_tree(path) == 0)
+    //    return nullptr;
     bool is_relative;
     if (path[0] == '/') {
         // strcpy(buff, path);
@@ -163,7 +170,7 @@ std::shared_ptr<inode> query_tree(
         *(--buff) = '.';
         is_relative = true;
     }
-    printf("%s\n", buff);
+    // printf("%s\n", buff);
     std::vector<size_t> lastbasestack;
     std::vector<size_t> lastposstack;
     if (!is_relative) {
@@ -180,13 +187,18 @@ std::shared_ptr<inode> query_tree(
         strdeque.push_back(".");
     int follownum = 0;
     while (!strdeque.empty()) {
-        printf("%s\n", buff);
+        // printf("%s\n", buff);
         std::string str = strdeque.front();
         strdeque.pop_front();
         size_t base = lastbasestack.back();
-        auto inodeptr = inomap[base];
-        if (!inodeptr->cached()) {
+        auto iter = inomap.find(base);
+        if (iter == inomap.end()) {
             errno = EACCES;
+            return nullptr;
+        }
+        auto inodeptr = iter->second;
+        if (!inodeptr->cached()) {
+            errno = ENOENT;
             return nullptr;
         }
         if (inodeptr->isDir()) {
@@ -212,6 +224,7 @@ std::shared_ptr<inode> query_tree(
             strcpy(&buff[bufpos], str.c_str());
             bufpos += str.length();
             buff[bufpos] = 0;
+            cache_tree(buff);
 
             // base = cache_path(buff);
             lastbasestack.push_back(base);
