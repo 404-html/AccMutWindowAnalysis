@@ -7,6 +7,7 @@
 #include <memory>
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/DirectoryFile.h>
 #include <llvm/AccMutRuntimeV3/filesystem/inodemapping/caching.h>
+#include <llvm/AccMutRuntimeV3/filesystem/inodemapping/cwd.h>
 
 static std::set <ino_t> dumped;
 
@@ -29,6 +30,27 @@ void dump_helper(FILE *f, ino_t ino) {
 
 void dump_cache(FILE *f, const char *base) {
     dumped.clear();
-    ino_t ino_base = cache_tree(base);
+    auto ptr = query_tree(base, 0, false);
+    if (!ptr) {
+        fprintf(f, "File %s not found\n", base);
+        return;
+    }
+    ino_t ino_base = ptr->getIno();
     dump_helper(f, ino_base);
+}
+
+void dump_single(FILE *f, const char *file) {
+    fprintf(f, "QUERY: %s\n", file);
+    if (file[0] != '/') {
+        char buff[MAXPATHLEN];
+        getwd_internal(buff);
+        fprintf(f, "BASE: %s\n", buff);
+    }
+    auto ptr = query_tree(file, 0, false);
+    if (!ptr) {
+        fprintf(f, "File %s not found\n", file);
+        return;
+    }
+    fprintf(f, "DUMP:\n");
+    ptr->dump(f);
 }

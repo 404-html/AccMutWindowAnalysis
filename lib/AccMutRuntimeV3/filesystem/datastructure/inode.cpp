@@ -5,8 +5,10 @@
 #include <llvm/AccMutRuntimeV3/filesystem/datastructure/inode.h>
 
 void inode::dump(FILE *f) {
+    fprintf(f, "ACCESS: %o\n", meta.st_mode & (~S_IFMT));
+    fprintf(f, "INODE: %lld\n", meta.st_ino);
     if (content)
         content->dump(f);
     else
-        fprintf(stderr, "Unknown content\n");
+        fprintf(f, "Unknown content\n");
 }

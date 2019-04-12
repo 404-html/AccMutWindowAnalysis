@@ -9,4 +9,6 @@
 
 void dump_cache(FILE *f, const char *base = "/");
 
+void dump_single(FILE *f, const char *file);
+
 #endif //LLVM_DUMP_H
