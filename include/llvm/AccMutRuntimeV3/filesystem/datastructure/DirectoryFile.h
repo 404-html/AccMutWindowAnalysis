@@ -20,6 +20,12 @@ public:
     inline iterator end() { return dirents.end(); };
     inline const_iterator begin() const { return dirents.begin(); };
     inline const_iterator end() const { return dirents.end(); };
+
+    inline iterator erase(iterator pos) { return dirents.erase(pos); }
+
+    inline iterator erase(const_iterator pos) { return dirents.erase(pos); }
+
+    inline void push_back(dirent d) { dirents.push_back(d); }
     void dump(FILE *f) override;
 };
 
